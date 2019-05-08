@@ -18,7 +18,7 @@ def long_description():
 
 setup(
     name="cvxpnpl",
-    version="0.1",
+    version="0.1.1",
     license="Apache 2.0",
     description="A convex Perspective-n-Points-and-Lines method.",
     long_description=long_description(),
