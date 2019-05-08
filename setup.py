@@ -1,5 +1,5 @@
 from setuptools import setup
-
+from cvxpnpl import __version__
 
 def install_requires():
     """Generate list with dependency requirements"""
@@ -18,7 +18,7 @@ def long_description():
 
 setup(
     name="cvxpnpl",
-    version="0.1.1",
+    version=__version__,
     license="Apache 2.0",
     description="A convex Perspective-n-Points-and-Lines method.",
     long_description=long_description(),

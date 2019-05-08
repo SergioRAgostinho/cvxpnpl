@@ -1,6 +1,8 @@
 import numpy as np
 import cvxpy as cvx
 
+__version__ = "0.1.2"
+
 
 def _point_constraints(pts_2d, pts_3d, K):
     """Build point constraints from 2D-3D correspondences.
