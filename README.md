@@ -10,6 +10,18 @@ A convex Perspective-n-Points-and-Lines method.
 
 **License:** Apache 2.0
 
+## Installing
+
+The easiest way to install the package is through pip
+```
+pip install cvxpnpl
+```
+
+Alternatively, you can clone this repo and invoke from its root folder
+```
+python setup.py install
+```
+
 ## Examples
 
 The library exposes 3 public functions: `pnp`, `pnl` and `pnpl`. You can find a couple of examples showing how to use each in the [examples folder](https://github.com/SergioRAgostinho/cvxpnpl/blob/master/examples).
