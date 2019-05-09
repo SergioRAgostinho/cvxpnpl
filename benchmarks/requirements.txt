@@ -1,0 +1,5 @@
+cycler
+matplotlib
+numpy
+cvxpy>=1.0.0
+scs<2.0.0

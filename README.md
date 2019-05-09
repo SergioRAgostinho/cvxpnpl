@@ -22,10 +22,15 @@ Alternatively, you can clone this repo and invoke from its root folder
 python setup.py install
 ```
 
+### SDP Solver, BLAS and LAPACK
+
+cvxpnpl makes use of [cvxpy](https://www.cvxpy.org/) as its opaque convex solver. However, cvxpy is only an abstraction layer and invokes [SCS](https://github.com/cvxgrp/scs) to obtain a solution to the underlying SDP problem. SCS requires BLAS and LAPACK which can be painful to set up for Windows users. With that in mind, I **really recommend that you install cvxpy through their anaconda channel**, as it will abstract away all of this dependency setup.
+
+
 ## Examples
 
 The library exposes 3 public functions: `pnp`, `pnl` and `pnpl`. You can find a couple of examples showing how to use each in the [examples folder](https://github.com/SergioRAgostinho/cvxpnpl/blob/master/examples).
 
-## SDP Solver, BLAS and LAPACK
+## Benchmarks
 
-cvxpnpl makes use of [cvxpy](https://www.cvxpy.org/) as its opaque convex solver. However, cvxpy is only an abstraction layer and invokes [SCS](https://github.com/cvxgrp/scs) to obtain a solution to the underlying SDP problem. SCS requires BLAS and LAPACK which can be painful to set up for Windows users. With that in mind, I **really recommend that you install cvxpy through their anaconda channel**, as it will abstract away all of this dependency setup.
+A number of benchmarks were conducted in order to validate the robustness of cvxpnpl in various scenarios and compare it against other methods. Please check the dedicated [README](https://github.com/SergioRAgostinho/cvxpnpl/blob/master/benchmarks/README.md) page on the topic.
