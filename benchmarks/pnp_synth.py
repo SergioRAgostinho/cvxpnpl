@@ -1,5 +1,7 @@
-import numpy as np
+import cv2
 from cvxpnpl import pnp
+import numpy as np
+
 
 from suite import Suite, parse_arguments
 
@@ -11,6 +13,24 @@ class CvxPnPl:
     @staticmethod
     def estimate_pose(pts_2d, pts_3d, K):
         return pnp(pts_2d, pts_3d, K)
+
+
+class EPnP:
+
+    name = "EPnP"
+
+    @staticmethod
+    def estimate_pose(pts_2d, pts_3d, K):
+
+        _, rvec, tvec = cv2.solvePnP(
+            objectPoints=pts_3d.astype(float),
+            imagePoints=pts_2d.astype(float).reshape((-1, 1, 2)),
+            cameraMatrix=K.astype(float),
+            distCoeffs=None,
+            flags=cv2.SOLVEPNP_EPNP,
+        )
+        R, _ = cv2.Rodrigues(rvec)
+        return [(R, tvec.ravel())]
 
 
 class PnPSynth(Suite):
@@ -119,7 +139,7 @@ if __name__ == "__main__":
         quit()
 
     # run something
-    session = PnPSynth(methods=[CvxPnPl], n_runs=100)
+    session = PnPSynth(methods=[CvxPnPl, EPnP], n_runs=100)
     session.run(n_elements=[4, 6, 8, 10, 12], noise=[0.0, 1.0, 2.0])
     if args.save:
         session.save(args.save)

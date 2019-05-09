@@ -9,6 +9,11 @@ The synthetic data experiments validate cvxpnpl against of numerous random reali
 ### Setup
 
 1. Install cvxpnpl on your system, through the methods described in [here](https://github.com/SergioRAgostinho/cvxpnpl/blob/master/README.md).
+2. Install all pip dependencies. From the root folder invoke
+  ```
+  pip install -r benchmarks/requirements.txt
+  ```
+
 
 ### Running the Benchmarks
 

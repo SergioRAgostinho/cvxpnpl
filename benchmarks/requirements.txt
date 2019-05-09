@@ -1,5 +1,6 @@
+cvxpy>=1.0.0
 cycler
 matplotlib
 numpy
-cvxpy>=1.0.0
+opencv-python
 scs<2.0.0
