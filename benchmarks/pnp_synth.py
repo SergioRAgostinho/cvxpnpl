@@ -1,7 +1,7 @@
 import cv2
 from cvxpnpl import pnp
 import numpy as np
-
+from pyopengv import absolute_pose_upnp as upnp
 
 from suite import Suite, parse_arguments
 
@@ -31,6 +31,29 @@ class EPnP:
         )
         R, _ = cv2.Rodrigues(rvec)
         return [(R, tvec.ravel())]
+
+class UPnP:
+
+    name = "UPnP"
+
+    @staticmethod
+    def estimate_pose(pts_2d, pts_3d, K):
+
+        # compute bearing vectors
+        n = len(pts_3d)
+        bearing = np.linalg.solve(K, np.vstack((pts_2d.T, np.ones(n)))).T
+        bearing /= np.linalg.norm(bearing, axis=1)[:, None]
+
+        # run pose estimation
+        poses = upnp(bearing, pts_3d)
+
+        # repackage results
+        poses_out = []
+        for T in poses:
+            R = T[:,:3].T
+            t = - R @ T[:,3]
+            poses_out.append((R, t))
+        return poses_out
 
 
 class PnPSynth(Suite):
@@ -139,7 +162,7 @@ if __name__ == "__main__":
         quit()
 
     # run something
-    session = PnPSynth(methods=[CvxPnPl, EPnP], n_runs=100)
+    session = PnPSynth(methods=[CvxPnPl, EPnP, UPnP], n_runs=100)
     session.run(n_elements=[4, 6, 8, 10, 12], noise=[0.0, 1.0, 2.0])
     if args.save:
         session.save(args.save)
