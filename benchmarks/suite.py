@@ -3,6 +3,7 @@ from itertools import product
 import pickle
 
 from cycler import cycler
+import matlab.engine
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 import numpy as np
@@ -40,6 +41,9 @@ def rm2aa(R):
 
 
 class Suite:
+
+    matlab_engine = None
+
     def __init__(self, methods=None, n_runs=10):
         # Kinect V1 intrinsics
         self.K = np.array(
@@ -56,6 +60,13 @@ class Suite:
 
         # placeholder for result storage
         self.results = None
+
+        # boot up Matlab Engine if needed
+        if Suite.matlab_engine is None:
+            # start the engine
+            print("Launching MATLAB Engine:", end="", flush=True)
+            Suite.matlab_engine = matlab.engine.start_matlab()
+            print(" DONE", flush=True)
 
     @staticmethod
     def compute_pose_error(groundtruth, estimate):
@@ -177,7 +188,7 @@ class Suite:
             labels,
             loc="lower center",
             bbox_to_anchor=(0.5, 0.05),
-            ncol=min(5, len(self.methods)),
+            ncol=len(self.methods),
         )
         plt.show()
 
@@ -188,3 +199,33 @@ class Suite:
     def save(self, path=None):
         pickle.dump(self, open(path, "wb"))
         print("Saved data to:", path)
+
+
+class VakhitovHelper:
+    """Utility functions to prepare inputs for what is requested
+    by functions in Vakhitov's pnpl toolbox. We adopt the same naming
+    convention the author used.
+    """
+
+    def lines(line_2d, line_3d, K):
+        # set up bearing vectors
+        bear = np.linalg.solve(
+            K, np.vstack((line_2d.reshape((-1, 2)).T, np.ones((1, 2 * len(line_2d)))))
+        ).T[:, :-1]
+        bear = bear.reshape((-1, 2, 2))
+
+        # Split points into start and end points
+        xs = matlab.double(bear[:, 0, :].T.tolist())
+        xe = matlab.double(bear[:, 1, :].T.tolist())
+        Xs = matlab.double(line_3d[0].T.tolist())
+        Xe = matlab.double((line_3d[0] + line_3d[1]).T.tolist())
+        return xs, xe, Xs, Xe
+
+    def points(pts_2d, pts_3d, K):
+        # set up bearing vectors
+        bear = np.linalg.solve(K, np.vstack((pts_2d.T, np.ones((1, len(pts_2d))))))
+
+        # Rename vars to PnPL convention
+        xxn = matlab.double(bear[:-1].tolist())
+        XXw = matlab.double(pts_3d.T.tolist())
+        return xxn, XXw

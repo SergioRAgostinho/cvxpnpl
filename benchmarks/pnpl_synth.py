@@ -1,7 +1,7 @@
 import numpy as np
 from cvxpnpl import pnpl
 
-from suite import Suite, parse_arguments
+from suite import Suite, VakhitovHelper, parse_arguments
 
 
 class CvxPnPl:
@@ -11,6 +11,75 @@ class CvxPnPl:
     @staticmethod
     def estimate_pose(pts_2d, line_2d, pts_3d, line_3d, K):
         return pnpl(pts_2d, line_2d, pts_3d, line_3d, K)
+
+
+class DLT:
+
+    name = "DLT"
+
+    @staticmethod
+    def estimate_pose(pts_2d, line_2d, pts_3d, line_3d, K):
+
+        # compose all geometric constraints
+        xxn, XXw = VakhitovHelper.points(pts_2d, pts_3d, K)
+        xs, xe, Xs, Xe = VakhitovHelper.lines(line_2d, line_3d, K)
+
+        # Invoke method on matlab
+        R, t = Suite.matlab_engine.DLT(XXw, xxn, xs, xe, Xs, Xe, nargout=2)
+
+        # Cast to numpy types
+        return [(np.array(R), np.array(t).ravel())]
+
+
+class EPnPL:
+
+    name = "EPnPL"
+
+    @staticmethod
+    def estimate_pose(pts_2d, line_2d, pts_3d, line_3d, K):
+
+        # requires a minimum of 6 elements
+        if (len(line_2d) + len(pts_2d)) < 6:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
+
+        # compose all geometric constraints
+        xxn, XXw = VakhitovHelper.points(pts_2d, pts_3d, K)
+        xs, xe, Xs, Xe = VakhitovHelper.lines(line_2d, line_3d, K)
+
+        # Invoke method on matlab
+        R, t = Suite.matlab_engine.EPnPLS_GN(XXw, xxn, xs, xe, Xs, Xe, nargout=2)
+
+        # Cast to numpy types
+        return [(np.array(R), np.array(t).ravel())]
+
+
+class OPnPL:
+
+    name = "OPnPL"
+
+    @staticmethod
+    def estimate_pose(pts_2d, line_2d, pts_3d, line_3d, K):
+
+        # compose all geometric constraints
+        xxn, XXw = VakhitovHelper.points(pts_2d, pts_3d, K)
+        xs, xe, Xs, Xe = VakhitovHelper.lines(line_2d, line_3d, K)
+
+        # Invoke method on matlab
+        Rs, ts = Suite.matlab_engine.OPnPL(XXw, xxn, xs, xe, Xs, Xe, nargout=2)
+        Rs, ts = np.array(Rs), np.array(ts)
+
+        # Detect if there's no multiple solutions
+        if len(Rs.shape) == 2:
+            return [(Rs, ts.ravel())]
+
+        # This method returns multiple poses even in a non-minimal case
+        # repackage results
+        poses_out = []
+        for i in range(Rs.shape[2]):
+            R = Rs[:, :, i]
+            t = ts[:, i]
+            poses_out.append((R, t))
+        return poses_out
 
 
 class PnPLSynth(Suite):
@@ -138,7 +207,7 @@ if __name__ == "__main__":
         quit()
 
     # run something
-    session = PnPLSynth(methods=[CvxPnPl], n_runs=100)
+    session = PnPLSynth(methods=[CvxPnPl, DLT, EPnPL, OPnPL], n_runs=100)
     session.run(n_elements=[4, 6, 8, 10, 12], noise=[0.0, 1.0, 2.0])
     if args.save:
         session.save(args.save)

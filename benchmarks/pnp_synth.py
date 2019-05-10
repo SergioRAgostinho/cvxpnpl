@@ -3,7 +3,7 @@ from cvxpnpl import pnp
 import numpy as np
 from pyopengv import absolute_pose_upnp as upnp
 
-from suite import Suite, parse_arguments
+from suite import Suite, VakhitovHelper, parse_arguments
 
 
 class CvxPnPl:
@@ -32,6 +32,34 @@ class EPnP:
         R, _ = cv2.Rodrigues(rvec)
         return [(R, tvec.ravel())]
 
+
+class OPnP:
+
+    name = "OPnP"
+
+    @staticmethod
+    def estimate_pose(pts_2d, pts_3d, K):
+
+        # compose point variables constraints
+        xxn, XXw = VakhitovHelper.points(pts_2d, pts_3d, K)
+
+        # Invoke method on matlab
+        Rs, ts = Suite.matlab_engine.OPnP(XXw, xxn, nargout=2)
+        Rs, ts = np.array(Rs), np.array(ts)
+
+        # Detect if there's no multiple solutions
+        if len(Rs.shape) == 2:
+            return [(Rs, ts.ravel())]
+
+        # repackage results
+        poses_out = []
+        for i in range(Rs.shape[2]):
+            R = Rs[:, :, i]
+            t = ts[:, i]
+            poses_out.append((R, t))
+        return poses_out
+
+
 class UPnP:
 
     name = "UPnP"
@@ -50,8 +78,8 @@ class UPnP:
         # repackage results
         poses_out = []
         for T in poses:
-            R = T[:,:3].T
-            t = - R @ T[:,3]
+            R = T[:, :3].T
+            t = -R @ T[:, 3]
             poses_out.append((R, t))
         return poses_out
 
@@ -162,7 +190,7 @@ if __name__ == "__main__":
         quit()
 
     # run something
-    session = PnPSynth(methods=[CvxPnPl, EPnP, UPnP], n_runs=100)
+    session = PnPSynth(methods=[CvxPnPl, EPnP, OPnP, UPnP], n_runs=100)
     session.run(n_elements=[4, 6, 8, 10, 12], noise=[0.0, 1.0, 2.0])
     if args.save:
         session.save(args.save)
