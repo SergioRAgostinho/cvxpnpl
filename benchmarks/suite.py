@@ -217,8 +217,8 @@ class VakhitovHelper:
         # Split points into start and end points
         xs = matlab.double(bear[:, 0, :].T.tolist())
         xe = matlab.double(bear[:, 1, :].T.tolist())
-        Xs = matlab.double(line_3d[0].T.tolist())
-        Xe = matlab.double((line_3d[0] + line_3d[1]).T.tolist())
+        Xs = matlab.double(line_3d[:, 0, :].T.tolist())
+        Xe = matlab.double((line_3d[:, 1, :]).T.tolist())
         return xs, xe, Xs, Xe
 
     def points(pts_2d, pts_3d, K):

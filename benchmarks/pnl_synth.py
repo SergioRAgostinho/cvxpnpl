@@ -170,8 +170,7 @@ class PnLSynth(Suite):
         # [l00, l01, l10, l11, l20, l21]
 
         # 3D line is organized
-        pts_3d = pts_3d.reshape((n_elements, 2, 3))
-        line_3d = (pts_3d[:, 0, :], pts_3d[:, 1, :] - pts_3d[:, 0, :])
+        line_3d = pts_3d.reshape((n_elements, 2, 3))
 
         # Organized as 3x2x2 tensor. Lines x points x pixels
         line_2d = pts_2d.reshape((n_elements, 2, 2))

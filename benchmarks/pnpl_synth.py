@@ -134,7 +134,6 @@ class PnPLSynth(Suite):
 
         # 3D line is organized
         line_3d = pts_3d[n_p:].reshape((n_l, 2, 3))
-        line_3d = (line_3d[:, 0, :], line_3d[:, 1, :] - line_3d[:, 0, :])
 
         # Organized as 3x2x2 tensor. Lines x points x pixels
         line_2d = pts_2d[n_p:].reshape((n_l, 2, 2))
