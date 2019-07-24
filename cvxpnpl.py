@@ -1,7 +1,7 @@
 import numpy as np
 import cvxpy as cvx
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 
 def _point_constraints(pts_2d, pts_3d, K):
@@ -92,9 +92,8 @@ def _line_constraints(line_2d, line_3d, K):
     Arguments:
     line_2d -- n x 2 x 2 np.array organized as (line, pt, dim). Each line is defined
     by sampling 2 points from it. Each point is a pixel in 2D.
-    line_3d -- A 2-element tuple organized as (points, directions). Each line is
-    parameterized by a 3D point and a 3D direction. The first element of the tuple
-    is a n x 3 np.array of 3D points and second is a n x 3 np.array of 3D directions.
+    line_3d -- A n x 2 x 3 np.array organized as (line, pt, dim). Each line is defined
+    by 2 points. The points reside in 3D.
     K -- 3 x 3 np.array with the camera intrinsics.
     """
     n = len(line_2d)
@@ -111,40 +110,27 @@ def _line_constraints(line_2d, line_3d, K):
 
     # Normalize for stability
     n_li /= np.linalg.norm(n_li, axis=1)[:, None]
+    n_li = np.hstack((n_li, n_li)).reshape((-1, 3))
     nx, ny, nz = n_li.T
 
     # line in 3D
-    PL, vL = line_3d
+    PL = line_3d.reshape((-1, 3))
     PLx, PLy, PLz = PL.T
-    vLx, vLy, vLz = vL.T
-
-    # Line constraints - direction
-    cl11 = vLx * nx
-    cl12 = vLx * ny
-    cl13 = vLx * nz
-    cl14 = vLy * nx
-    cl15 = vLy * ny
-    cl16 = vLy * nz
-    cl17 = vLz * nx
-    cl18 = vLz * ny
-    cl19 = vLz * nz
 
     # Line constraints - point
-    cl21 = PLx * nx
-    cl22 = PLx * ny
-    cl23 = PLx * nz
-    cl24 = PLy * nx
-    cl25 = PLy * ny
-    cl26 = PLy * nz
-    cl27 = PLz * nx
-    cl28 = PLz * ny
-    cl29 = PLz * nz
+    cl1 = PLx * nx
+    cl2 = PLx * ny
+    cl3 = PLx * nz
+    cl4 = PLy * nx
+    cl5 = PLy * ny
+    cl6 = PLy * nz
+    cl7 = PLz * nx
+    cl8 = PLz * ny
+    cl9 = PLz * nz
 
     ## Compose block matrices for the equation system
-    cl1 = np.stack((cl11, cl12, cl13, cl14, cl15, cl16, cl17, cl18, cl19), axis=1)
-    cl2 = np.stack((cl21, cl22, cl23, cl24, cl25, cl26, cl27, cl28, cl29), axis=1)
-
-    return (cl1, cl2), n_li
+    C = np.stack((cl1, cl2, cl3, cl4, cl5, cl6, cl7, cl8, cl9), axis=1)
+    return C, n_li
 
 
 def _shor(A, eps=1e-9, max_iters=2500, verbose=False):
@@ -484,20 +470,19 @@ def pnl(line_2d, line_3d, K, eps=1e-9, max_iters=2500, verbose=False):
     Arguments:
     line_2d -- n x 2 x 2 np.array organized as (line, pt, dim). Each line is defined
     by sampling 2 points from it. Each point is a pixel in 2D.
-    line_3d -- A 2-element tuple organized as (points, directions). Each line is
-    parameterized by a 3D point and a 3D direction. The first element of the tuple
-    is a n x 3 np.array of 3D points and second is a n x 3 np.array of 3D directions.
+    line_3d -- A n x 2 x 3 np.array organized as (line, pt, dim). Each line is defined
+    by 2 points. The points reside in 3D.
     K -- 3 x 3 np.array with the camera intrinsics.
     eps -- numerical precision of the solver
     max_iters -- maximum number of iterations the solver is allowed to perform
     verbose -- print additional solver information to the console
     """
     # Extract point constraints
-    (C1, C2), N = _line_constraints(line_2d, line_3d, K)
+    C, N = _line_constraints(line_2d, line_3d, K)
 
     # Compose block matrices
-    B = np.linalg.solve(N.T @ N, N.T) @ C2
-    A = np.vstack((C1, C2 - N @ B))
+    B = np.linalg.solve(N.T @ N, N.T @ C)
+    A = C - N @ B
 
     # Solve the QCQP using shor's relaxation
     return _solve_relaxation(A, B, eps=eps, max_iters=max_iters, verbose=verbose)
@@ -511,9 +496,8 @@ def pnpl(pts_2d, line_2d, pts_3d, line_3d, K, eps=1e-9, max_iters=2500, verbose=
     line_2d -- n x 2 x 2 np.array organized as (line, pt, dim). Each line is defined
     by sampling 2 points from it. Each point is a pixel in 2D.
     pts_3d -- n x 3 np.array of 3D points
-    line_3d -- A 2-element tuple organized as (points, directions). Each line is
-    parameterized by a 3D point and a 3D direction. The first element of the tuple
-    is a n x 3 np.array of 3D points and second is a n x 3 np.array of 3D directions.
+    line_3d -- A n x 2 x 3 np.array organized as (line, pt, dim). Each line is defined
+    by 2 points. The points reside in 3D.
     K -- 3 x 3 np.array with the camera intrinsics.
     eps -- numerical precision of the solver
     max_iters -- maximum number of iterations the solver is allowed to perform
@@ -525,15 +509,15 @@ def pnpl(pts_2d, line_2d, pts_3d, line_3d, K, eps=1e-9, max_iters=2500, verbose=
     )
 
     # Extract line constraints
-    (Cl1, Cl2), Nl = _line_constraints(line_2d.reshape((-1, 2, 2)), line_3d, K)
+    Cl, Nl = _line_constraints(line_2d.reshape((-1, 2, 2)), line_3d, K)
 
     # Compose block matrices
-    C = np.vstack((Cp1, Cp2, Cp3, Cl2))
+    C = np.vstack((Cp1, Cp2, Cp3, Cl))
     N = np.vstack((Np1, Np2, Np3, Nl))
 
     # Compose block matrices
-    B = np.linalg.solve(N.T @ N, N.T) @ C
-    A = np.vstack((Cl1, C - N @ B))
+    B = np.linalg.solve(N.T @ N, N.T @ C)
+    A = C - N @ B
 
     # Solve the QCQP using shor's relaxation
     return _solve_relaxation(A, B, eps=eps, max_iters=max_iters, verbose=verbose)

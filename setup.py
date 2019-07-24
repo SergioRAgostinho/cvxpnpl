@@ -1,6 +1,7 @@
 from setuptools import setup
 from cvxpnpl import __version__
 
+
 def install_requires():
     """Generate list with dependency requirements"""
 
@@ -10,10 +11,10 @@ def install_requires():
             deps.append(line[:-1])
     return deps
 
+
 def long_description():
     with open("README.md", "r") as f:
         return f.read()
-
 
 
 setup(
