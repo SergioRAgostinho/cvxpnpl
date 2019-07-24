@@ -5,15 +5,10 @@ from cvxpnpl import pnl
 np.random.seed(0)
 np.random.seed(42)
 
-# 3D lines are parameterized as pts and direction stacked into a tuple
+# 3D lines are parameterized as two points organized into a np.array
+# with the layout (line, pts, dim)
 # instantiate a couple of points centered around the origin
-pts = 0.6 * (np.random.random((6, 3)) - 0.5)
-
-# generate normalized directions
-directions = 2 * (np.random.random((6, 3)) - 0.5)
-directions /= np.linalg.norm(directions, axis=1)[:, None]
-
-line_3d = (pts, directions)
+line_3d = 0.6 * (np.random.random((6, 2, 3)) - 0.5)
 
 # Made up projective matrix
 K = np.array([[160, 0, 320], [0, 120, 240], [0, 0, 1]])
@@ -29,7 +24,7 @@ R_gt = np.array(
 t_gt = np.array([-0.0767557, 0.13917375, 1.9708239])
 
 # Sample to points from the line and project them to 2D
-pts_s = np.hstack((pts, pts + directions)).reshape((-1, 3))
+pts_s = line_3d.reshape((-1, 3))
 line_2d = (pts_s @ R_gt.T + t_gt) @ K.T
 
 # this variable is organized as (line, point, dim)
