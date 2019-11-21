@@ -1,7 +1,8 @@
 import numpy as np
-import cvxpy as cvx
+from scipy.sparse import csc_matrix
+import scs
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
 def _point_constraints(pts_2d, pts_3d, K):
@@ -131,90 +132,6 @@ def _line_constraints(line_2d, line_3d, K):
     ## Compose block matrices for the equation system
     C = np.stack((cl1, cl2, cl3, cl4, cl5, cl6, cl7, cl8, cl9), axis=1)
     return C, n_li
-
-
-def _shor(A, eps=1e-9, max_iters=2500, verbose=False):
-    """Solves the relaxed optimization problem with respect to Z, given the homogeneous
-    linear system of the form A r = 0.
-
-    Arguments:
-    A -- the matrix defining the homogeneous linear system
-    eps -- requested precision to the convex solver
-    max_iters -- maximum number of iterations the solver is allowed to perform
-    verbose -- print additional information to the console
-    """
-    # Construct Q
-    Q = np.block([[A.T @ A, np.zeros((9, 1))], [np.zeros((1, 9)), 0]])
-
-    # Variables
-    Z = cvx.Variable(shape=(10, 10), symmetric=True)
-
-    # Constraints
-    Pr = np.empty((6, 10, 10))
-    Pc = np.empty((6, 10, 10))
-    Pdet = np.empty((9, 10, 10))
-
-    # Rows and cols
-    k = 0
-    for i in range(3):
-        for j in range(i, 3):
-
-            E_ij = np.zeros((3, 3))
-            E_ij[i, j] = 1
-
-            P = np.block(
-                [
-                    [np.kron(np.eye(3), E_ij.T), np.zeros((9, 1))],
-                    [np.zeros(9), -int(i == j)],
-                ]
-            )
-            Pr[k] = 0.5 * (P + P.T)
-
-            P = np.block(
-                [
-                    [np.kron(E_ij, np.eye(3)), np.zeros((9, 1))],
-                    [np.zeros(9), -int(i == j)],
-                ]
-            )
-            Pc[k] = 0.5 * (P + P.T)
-            k += 1
-
-    # Determinant
-    m = 0
-    for i, j, k in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
-        for l in range(3):
-
-            E_ji = np.zeros((3, 3))
-            E_ji[j, i] = 1
-
-            e_l = np.zeros(3)
-            e_l[l] = 1
-
-            e_k = np.zeros(3)
-            e_k[k] = 1
-
-            S = np.array(
-                [[0, -e_l[2], e_l[1]], [e_l[2], 0, -e_l[0]], [-e_l[1], e_l[0], 0]]
-            )
-
-            P = np.block(
-                [[np.kron(E_ji, S), np.zeros((9, 1))], [-np.kron(e_k, e_l), 0]]
-            )
-
-            Pdet[m] = 0.5 * (P + P.T)
-            m += 1
-
-    # Compose all constraints
-    constraints = [Z[9, 9] == 1, Z >> 0]
-    for Pgroup in (Pr, Pc, Pdet):
-        for P in Pgroup:
-            constraints.append(cvx.trace(P * Z) == 0)
-
-    # Invoke problem
-    cost = cvx.Minimize(cvx.trace(Q * Z))
-    prob = cvx.Problem(cost, constraints)
-    prob.solve(eps=eps, max_iters=max_iters, verbose=verbose)
-    return Z.value
 
 
 def _re6q3(A):
@@ -370,7 +287,9 @@ def _constraint_ortho_det(vecs, rank):
         coeffs = np.mean(A, axis=0)
         a = np.empty(2)
 
-        root = np.real(np.sqrt(coeffs[1] * coeffs[1] - 4 * coeffs[0] * coeffs[2]))
+        root = np.real(
+            np.sqrt(np.maximum(coeffs[1] * coeffs[1] - 4 * coeffs[0] * coeffs[2], 0))
+        )
         a[0] = (-coeffs[1] + root) / (2 * coeffs[0])
         a[1] = (-coeffs[1] - root) / (2 * coeffs[0])
         alpha_d = np.stack([a, np.ones(2)], axis=1)
@@ -404,6 +323,108 @@ def _constraint_ortho_det(vecs, rank):
     return alpha_d @ V.T
 
 
+def _vech10(A, scale=1):
+    """Create a vectorized version of a symmetric matrix and
+    scale the off diagonal elements with scale
+    """
+    S = scale * np.ones_like(A)
+    S[np.eye(10, dtype=bool)] = 1
+
+    As = S * A
+    return np.concatenate(
+        (
+            As[:, 0],
+            As[1:, 1],
+            As[2:, 2],
+            As[3:, 3],
+            As[4:, 4],
+            As[5:, 5],
+            As[6:, 6],
+            As[7:, 7],
+            As[8:, 8],
+            np.atleast_1d(As[9, 9]),
+        )
+    )
+
+
+def _vech10_inv(v):
+    """Create a symmetric matrix from its vectorized
+    representation
+    """
+    A = np.empty((10, 10))
+    ke = 0
+    for i in range(10):
+        ks = ke
+        ke = ks + 10 - i
+        A[i, i:] = v[ks:ke]
+        A[i:, i] = v[ks:ke]
+    return A
+
+
+def _sdp_constraints():
+    """Generates the static sdp constraints for the optimization problem"""
+
+    # Placeholder
+    Ad = np.zeros((77, 55))
+    E_ij = np.reshape(
+        np.eye(3)[:, None, :, None] * np.eye(3)[None, :, None], (-1, 3, 3)
+    )
+
+    # Linear equalities
+    # Z10,10 = 1
+    Ad[0, -1] = 1
+
+    # Rows and cols
+    E_ij_rc = E_ij[[0, 1, 2, 4, 5, 8]]
+    c = np.array((1, 0, 0, 1, 0, 1))
+    for i in range(6):
+        P = np.block(
+            [
+                [np.kron(np.eye(3), E_ij_rc[i].T), np.zeros((9, 1))],
+                [np.zeros(9), -c[i]],
+            ]
+        )
+        Ad[i + 1] = _vech10(0.5 * (P + P.T), 2)
+
+        P = np.block(
+            [[np.kron(E_ij_rc[i], np.eye(3)), np.zeros((9, 1))], [np.zeros(9), -c[i]],]
+        )
+        Ad[i + 7] = _vech10(0.5 * (P + P.T), 2)
+
+    # Determinant
+    E_ji_det = E_ij[[3, 3, 3, 7, 7, 7, 2, 2, 2]]
+    e_l = np.kron(np.ones(3), np.eye(3)).T
+    e_k = np.repeat(np.eye(3)[[2, 0, 1]], 3, axis=0)
+    for i in range(9):
+        S = np.array(
+            [
+                [0, -e_l[i, 2], e_l[i, 1]],
+                [e_l[i, 2], 0, -e_l[i, 0]],
+                [-e_l[i, 1], e_l[i, 0], 0],
+            ]
+        )
+        P = np.block(
+            [[np.kron(E_ji_det[i], S), np.zeros((9, 1))], [-np.kron(e_k[i], e_l[i]), 0]]
+        )
+        Ad[i + 13] = _vech10(0.5 * (P + P.T), 2)
+
+    # Cones
+    mask = np.concatenate((np.zeros((22, 55), dtype=bool), np.eye(55, dtype=bool)))
+    Ad[mask] = -_vech10(np.ones((10, 10)), np.sqrt(2))
+
+    # convert to csc matrix
+    A = csc_matrix(Ad)
+
+    # Constants
+    b = np.zeros(77)
+    b[0] = 1
+
+    return A, b
+
+
+_A, _b = _sdp_constraints()
+
+
 def _solve_relaxation(A, B, eps=1e-9, max_iters=2500, verbose=False):
     """Given the linear system formed by the problem's geometric constraints,
     computes all possible poses.
@@ -418,7 +439,20 @@ def _solve_relaxation(A, B, eps=1e-9, max_iters=2500, verbose=False):
     verbose -- print additional information to the console
     """
     # Solve the QCQP using shor's relaxation
-    Z = _shor(A, eps=eps, max_iters=max_iters, verbose=verbose)
+    # Construct Q
+    Q = np.block([[A.T @ A, np.zeros((9, 1))], [np.zeros((1, 9)), 0]])
+
+    # Invoke solver
+    results = scs.solve(
+        {"A": _A, "b": _b, "c": _vech10(Q, 2)},  # data
+        {"f": 22, "l": 0, "q": [], "ep": 0, "s": [10]},  # cones
+        verbose=verbose,
+        eps=eps,
+        max_iters=max_iters,
+    )
+    # Invoke solver
+    # results = scs.solve({"A": _A, "b": _b, "c": _vech10(Q, 2)}, {"f": 22, "l": 0, "q": [], "ep": 0, "s": [10]}, verbose=True, eps=eps, max_iters=max_iters)
+    Z = _vech10_inv(results["x"])
     vals, vecs = np.linalg.eigh(Z)
 
     # check for rank
