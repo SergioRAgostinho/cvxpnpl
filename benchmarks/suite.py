@@ -34,10 +34,42 @@ def aa2rm(aa):
 
 def rm2aa(R):
     """Construct an axis angle representation from rotation matrix"""
-    sk = 0.5 * (R - R.T)
-    sin_angle = np.linalg.norm((sk[0, 1], sk[0, 2], sk[1, 2]))
-    sk /= sin_angle
-    return np.arcsin(sin_angle) * np.array((sk[2, 1], sk[0, 2], sk[1, 0]))
+    Ru = np.atleast_3d(R).reshape((-1,3,3))
+    U, _, Vh = np.linalg.svd(Ru)
+    Ru = U @ Vh
+    r = 0.5 * np.stack((Ru[:,2,1] - Ru[:,1,2], Ru[:,0,2] - Ru[:,2,0], Ru[:,1,0] - Ru[:,0,1]), axis=-1)
+    sin_ = np.linalg.norm(r, axis=-1)
+
+    cos_ = np.maximum(-1, np.minimum(1, 0.5*(np.trace(Ru, axis1=-2, axis2=-1) - 1)))
+    theta = np.arccos(cos_)
+    r *= (theta / sin_)[:,None]
+
+    # # np.finfo(float).eps -> 2.220446049250313e-16
+    # if sin_ < 2.220446049250313e-16:
+    mask_s = sin_ < 1e-10
+    mask_c = cos_ > 0
+
+    # Zero mask
+    mask = np.logical_and(mask_s, mask_c)
+    r[mask] = np.zeros_like(r[mask])
+
+    # tweaking with axis mask
+    mask = np.logical_and(mask_s, np.logical_not(mask_c))
+    r[mask] = np.maximum(0.5 * (np.diagonal(Ru[mask], axis1=-2, axis2=-1) + 1), 0) \
+                * np.stack((np.ones_like(Ru[mask,0,0]), Ru[mask,0,1], Ru[mask,0,2]), axis=-1)
+
+    # Flip the z sign in some rate occasions
+    if len(r[mask]):
+        mask_z = np.logical_and(
+            np.min(r[mask], axis=-1) == r[mask,0],
+            (Ru[mask,1,2] > 0) != (r[mask,1] * r[mask,2] > 0),
+        )
+        r[mask][mask_z][2] = -r[mask][mask_z][2]
+
+    # Final scaling
+    r[mask] *= (theta[mask] / np.linalg.norm(r[mask], axis=-1))[:,None]
+    return r
+
 
 
 class Suite:

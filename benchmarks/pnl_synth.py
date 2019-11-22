@@ -205,6 +205,12 @@ class PnLSynth(Suite):
                             method, line_2d, line_3d, groundtruth=(R_gt, t_gt)
                         )
 
+                        # Sanitize results
+                        if np.any(np.isnan(R)) or np.any(np.isnan(t)):
+                            self.results["angular"][i, j, k, l] = np.nan
+                            self.results["translation"][i, j, k, l] = np.nan
+                            continue
+
                         # store error results in the object
                         ang, trans = PnLSynth.compute_pose_error(
                             groundtruth=(R_gt, t_gt), estimate=(R, t)
