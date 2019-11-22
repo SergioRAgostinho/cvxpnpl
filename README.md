@@ -24,7 +24,7 @@ python setup.py install
 
 ### SDP Solver, BLAS and LAPACK
 
-cvxpnpl makes use of [cvxpy](https://www.cvxpy.org/) as its opaque convex solver. However, cvxpy is only an abstraction layer and invokes [SCS](https://github.com/cvxgrp/scs) to obtain a solution to the underlying SDP problem. SCS requires BLAS and LAPACK which can be painful to set up for Windows users. With that in mind, I **really recommend that you install cvxpy through their anaconda channel**, as it will abstract away all of this dependency setup.
+cvxpnpl makes use of [SCS](https://github.com/cvxgrp/scs) to obtain a solution to the underlying SDP problem. SCS requires BLAS and LAPACK which can be painful to set up for Windows users. As of version 2.0.0, SCS is permanently linking with LAPACK and BLAS and it is possible that the process is now easier for Windows users as well.
 
 
 ## Examples

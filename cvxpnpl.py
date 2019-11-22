@@ -1,8 +1,9 @@
+import warnings
 import numpy as np
 from scipy.sparse import csc_matrix
 import scs
 
-__version__ = "0.3.0"
+__version__ = "1.0.0"
 
 
 def _point_constraints(pts_2d, pts_3d, K):
@@ -451,8 +452,11 @@ def _solve_relaxation(A, B, eps=1e-9, max_iters=2500, verbose=False):
         max_iters=max_iters,
     )
     # Invoke solver
-    # results = scs.solve({"A": _A, "b": _b, "c": _vech10(Q, 2)}, {"f": 22, "l": 0, "q": [], "ep": 0, "s": [10]}, verbose=True, eps=eps, max_iters=max_iters)
     Z = _vech10_inv(results["x"])
+    if np.any(np.isnan(Z)):
+        if verbose:
+            warnings.warn("The SDP solver did not return a valid solution. Increasing max_iters might solve the issue.")
+        return [(np.full((3,3), np.nan), np.full(3, np.nan))]
     vals, vecs = np.linalg.eigh(Z)
 
     # check for rank
