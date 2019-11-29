@@ -1,3 +1,5 @@
+import time
+
 import cv2
 from cvxpnpl import pnp
 import numpy as np
@@ -85,22 +87,30 @@ class UPnP:
 
 
 class PnPSynth(Suite):
-    def __init__(self, methods=None, n_runs=10):
+    def __init__(self, methods=None, n_runs=10, timed=True):
 
         super().__init__(
-            methods=[CvxPnPl] if methods is None else methods, n_runs=n_runs
+            methods=[CvxPnPl] if methods is None else methods,
+            n_runs=n_runs,
+            timed=timed,
         )
 
     def estimate_pose(self, method, pts_2d, pts_3d, groundtruth):
 
+        # time counting mechanism
+        start = time.time()
+
         # run estimation method
         poses = method.estimate_pose(pts_2d, pts_3d, self.K)
+
+        # elapsed time
+        elapsed = time.time() - start
 
         # it can happen that certain realizations with fewer elements
         # admit more than one valid pose. we use additional support points to
         # disambiguate
         if len(poses) == 1:
-            return poses[0]
+            return poses[0], elapsed
 
         # create support points
         R_gt, t_gt = groundtruth
@@ -117,7 +127,7 @@ class PnPSynth(Suite):
                 min_error = err
                 min_idx = i
 
-        return poses[min_idx]
+        return poses[min_idx], elapsed
 
     def scenario(self, n_elements, noise):
 
@@ -128,8 +138,11 @@ class PnPSynth(Suite):
         pts_2d += np.random.normal(scale=noise, size=pts_2d.shape)
         return pts_2d, pts_3d, R, t
 
-    def plot(self):
-        super().plot("Points")
+    def plot(self, tight=False):
+        super().plot("Points", tight=tight)
+
+    def plot_timings(self, tight=False):
+        super().plot_timings("Points", tight=tight)
 
     def run(self, n_elements=None, noise=None):
 
@@ -153,7 +166,7 @@ class PnPSynth(Suite):
                     for k, method in enumerate(self.methods):
 
                         # estimate pose
-                        R, t = self.estimate_pose(
+                        (R, t), elapsed_time = self.estimate_pose(
                             method, pts_2d, pts_3d, groundtruth=(R_gt, t_gt)
                         )
 
@@ -169,6 +182,8 @@ class PnPSynth(Suite):
                         )
                         self.results["angular"][i, j, k, l] = ang
                         self.results["translation"][i, j, k, l] = trans
+                        if self.timed:
+                            self.results["time"][i, j, k, l] = elapsed_time
 
                     i_prog += 1
                     print(
@@ -192,13 +207,14 @@ if __name__ == "__main__":
     # Just a loading data scenario
     if args.load:
         session = PnPSynth.load(args.load)
+        session.print_timings()
         session.plot()
         quit()
 
     # run something
-    session = PnPSynth(methods=[CvxPnPl, EPnP, OPnP, UPnP], n_runs=100)
+    session = PnPSynth(methods=[CvxPnPl, EPnP, OPnP, UPnP], n_runs=1000)
     session.run(n_elements=[4, 6, 8, 10, 12], noise=[0.0, 1.0, 2.0])
     if args.save:
         session.save(args.save)
-
+    session.print_timings()
     session.plot()

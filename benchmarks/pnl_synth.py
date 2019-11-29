@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from cvxpnpl import pnl
 
@@ -124,22 +126,30 @@ class RPnL:
 
 
 class PnLSynth(Suite):
-    def __init__(self, methods=None, n_runs=10):
+    def __init__(self, methods=None, n_runs=10, timed=True):
 
         super().__init__(
-            methods=[CvxPnPl] if methods is None else methods, n_runs=n_runs
+            methods=[CvxPnPl] if methods is None else methods,
+            n_runs=n_runs,
+            timed=timed,
         )
 
     def estimate_pose(self, method, line_2d, line_3d, groundtruth):
 
+        # time counting mechanism
+        start = time.time()
+
         # run estimation method
         poses = method.estimate_pose(line_2d, line_3d, self.K)
+
+        # elapsed time
+        elapsed = time.time() - start
 
         # it can happen that certain realizations with fewer elements
         # admit more than one valid pose. we use additional support points to
         # disambiguate
         if len(poses) == 1:
-            return poses[0]
+            return poses[0], elapsed
 
         # create support points
         R_gt, t_gt = groundtruth
@@ -156,7 +166,7 @@ class PnLSynth(Suite):
                 min_error = err
                 min_idx = i
 
-        return poses[min_idx]
+        return poses[min_idx], elapsed
 
     def scenario(self, n_elements, noise):
 
@@ -176,8 +186,8 @@ class PnLSynth(Suite):
         line_2d = pts_2d.reshape((n_elements, 2, 2))
         return line_2d, line_3d, R, t
 
-    def plot(self):
-        super().plot("Points")
+    def plot(self, tight=False):
+        super().plot("Lines", tight)
 
     def run(self, n_elements=None, noise=None):
 
@@ -201,7 +211,7 @@ class PnLSynth(Suite):
                     for k, method in enumerate(self.methods):
 
                         # estimate pose
-                        R, t = self.estimate_pose(
+                        (R, t), elapsed_time = self.estimate_pose(
                             method, line_2d, line_3d, groundtruth=(R_gt, t_gt)
                         )
 
@@ -217,6 +227,8 @@ class PnLSynth(Suite):
                         )
                         self.results["angular"][i, j, k, l] = ang
                         self.results["translation"][i, j, k, l] = trans
+                        if self.timed:
+                            self.results["time"][i, j, k, l] = elapsed_time
 
                     i_prog += 1
                     print(
@@ -240,15 +252,16 @@ if __name__ == "__main__":
     # Just a loading data scenario
     if args.load:
         session = PnLSynth.load(args.load)
+        session.print_timings()
         session.plot()
         quit()
 
     # run something
     session = PnLSynth(
-        methods=[CvxPnPl, EPnPL, Mirzaei, OPnPL, Pluecker, RPnL], n_runs=100
+        methods=[CvxPnPl, EPnPL, Mirzaei, OPnPL, Pluecker, RPnL], n_runs=1000
     )
     session.run(n_elements=[4, 6, 8, 10, 12], noise=[0.0, 1.0, 2.0])
     if args.save:
         session.save(args.save)
-
+    session.print_timings()
     session.plot()
