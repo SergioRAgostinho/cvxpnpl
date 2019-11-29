@@ -1,11 +1,23 @@
+from importlib import import_module
 import time
 
 import cv2
 from cvxpnpl import pnp
 import numpy as np
-from pyopengv import absolute_pose_upnp as upnp
 
 from suite import Suite, VakhitovHelper, parse_arguments
+
+# Dynamically import pyopengv
+pyopengv = None
+upnp = None
+
+try:
+    pyopengv = import_module("pyopengv")
+except ModuleNotFoundError:
+    pass
+
+if pyopengv is not None:
+    upnp = pyopengv.absolute_pose_upnp
 
 
 class CvxPnPl:

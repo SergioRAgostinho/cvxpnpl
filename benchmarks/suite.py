@@ -1,13 +1,20 @@
 import argparse
+from importlib import import_module
 from itertools import product
 import pickle
 import warnings
 
 from cycler import cycler
-import matlab.engine
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 import numpy as np
+
+# Dynamically import matlab
+matlab = None
+try:
+    matlab = import_module("matlab")
+except ModuleNotFoundError:
+    pass
 
 
 def parse_arguments():
@@ -99,7 +106,7 @@ class Suite:
         self.timed = timed
 
         # boot up Matlab Engine if needed
-        if Suite.matlab_engine is None:
+        if Suite.matlab_engine is None and matlab is not None:
             # start the engine
             print("Launching MATLAB Engine:", end="", flush=True)
             Suite.matlab_engine = matlab.engine.start_matlab()
