@@ -11,8 +11,10 @@ import numpy as np
 
 # Dynamically import matlab
 matlab = None
+_matlab_engine = None
 try:
     matlab = import_module("matlab")
+    matlab.engine = import_module("matlab.engine")
 except ModuleNotFoundError:
     pass
 
@@ -20,10 +22,16 @@ except ModuleNotFoundError:
 def parse_arguments():
 
     parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--save", help="File path to store the session data.")
-    group.add_argument("--load", help="File path to load and plot session data.")
-    parser.add_argument("--tight", help="Show tight figures.", action="store_true")
+
+    group_save_load = parser.add_mutually_exclusive_group()
+    group_save_load.add_argument("--save", help="File path to store the session data.")
+    group_save_load.add_argument("--load", help="File path to load and plot session data.")
+
+    group_figures = parser.add_mutually_exclusive_group()
+    group_figures.add_argument("--tight", help="Show tight figures.", action="store_true")
+    group_figures.add_argument("--no-display", help="Don't display any figures.", action="store_true")
+
+    parser.add_argument("--runs", type=int, default=1000, help="Number of runs each scenario is instantiated.")
     return parser.parse_args()
 
 
@@ -41,53 +49,28 @@ def aa2rm(aa):
     return R
 
 
-def rm2aa(R):
-    """Construct an axis angle representation from rotation matrix"""
-    Ru = np.atleast_3d(R).reshape((-1, 3, 3))
+def angle(R):
+    """The angle from a rotation matrix"""
+    Ru = R.reshape((-1, 3, 3))
     U, _, Vh = np.linalg.svd(Ru)
     Ru = U @ Vh
-    r = 0.5 * np.stack(
-        (
-            Ru[:, 2, 1] - Ru[:, 1, 2],
-            Ru[:, 0, 2] - Ru[:, 2, 0],
-            Ru[:, 1, 0] - Ru[:, 0, 1],
-        ),
-        axis=-1,
-    )
-    sin_ = np.linalg.norm(r, axis=-1)
 
-    cos_ = np.maximum(-1, np.minimum(1, 0.5 * (np.trace(Ru, axis1=-2, axis2=-1) - 1)))
-    theta = np.arccos(cos_)
-    r *= (theta / sin_)[:, None]
+    return np.arccos(np.clip(0.5*(Ru.trace(axis1=-2, axis2=-1) - 1), -1, 1)).squeeze()
 
-    # # np.finfo(float).eps -> 2.220446049250313e-16
-    # if sin_ < 2.220446049250313e-16:
-    mask_s = sin_ < 1e-10
-    mask_c = cos_ > 0
 
-    # Zero mask
-    mask = np.logical_and(mask_s, mask_c)
-    r[mask] = np.zeros_like(r[mask])
+def init_matlab():
+    global _matlab_engine
+    if matlab is None:
+        return None
 
-    # tweaking with axis mask
-    mask = np.logical_and(mask_s, np.logical_not(mask_c))
-    r[mask] = np.maximum(
-        0.5 * (np.diagonal(Ru[mask], axis1=-2, axis2=-1) + 1), 0
-    ) * np.stack(
-        (np.ones_like(Ru[mask, 0, 0]), Ru[mask, 0, 1], Ru[mask, 0, 2]), axis=-1
-    )
+    if _matlab_engine is not None:
+        return _matlab_engine
 
-    # Flip the z sign in some rate occasions
-    if len(r[mask]):
-        mask_z = np.logical_and(
-            np.min(r[mask], axis=-1) == r[mask, 0],
-            (Ru[mask, 1, 2] > 0) != (r[mask, 1] * r[mask, 2] > 0),
-        )
-        r[mask][mask_z][2] = -r[mask][mask_z][2]
-
-    # Final scaling
-    r[mask] *= (theta[mask] / np.linalg.norm(r[mask], axis=-1))[:, None]
-    return r
+    # start the engine
+    print("Launching MATLAB Engine: ", end="", flush=True)
+    _matlab_engine = matlab.engine.start_matlab()
+    print("DONE", flush=True)
+    return _matlab_engine
 
 
 class Suite:
@@ -104,7 +87,7 @@ class Suite:
         # store simulation properties
         self.LENGTH = 0.6
         self.n_runs = n_runs
-        self.methods = methods
+        self.methods = type(self).filter_methods(methods)
         self.noise = None
         self.n_elements = [4]
 
@@ -115,11 +98,25 @@ class Suite:
         self.timed = timed
 
         # boot up Matlab Engine if needed
-        if Suite.matlab_engine is None and matlab is not None:
-            # start the engine
-            print("Launching MATLAB Engine:", end="", flush=True)
-            Suite.matlab_engine = matlab.engine.start_matlab()
-            print(" DONE", flush=True)
+        if Suite.matlab_engine is None:
+            Suite.matlab_engine = init_matlab()
+
+
+    @staticmethod
+    def filter_methods(methods):
+        not_initialized = [method.name for method in methods ]
+        not_initialized = []
+        filtered = []
+        for method in methods:
+            if hasattr(method, "loaded") and not method.loaded:
+                not_initialized.append(method.name)
+            else:
+                filtered.append(method)
+
+        if len(not_initialized):
+            warnings.warn(f"The dependencies for the following methods could not be loaded: {not_initialized}.\nDiscarding them from the benchmarks")
+
+        return filtered
 
     @staticmethod
     def compute_pose_error(groundtruth, estimate):
@@ -129,7 +126,7 @@ class Suite:
 
         # Compute angular error
         R_err = np.linalg.solve(R_gt, R)
-        ang = np.linalg.norm(rm2aa(R_err)) * 180.0 / np.pi
+        ang = angle(R_err) * 180.0 / np.pi
 
         # Compute translation error
         trans = np.linalg.norm(t - t_gt) / np.linalg.norm(t_gt)
@@ -264,7 +261,7 @@ class Suite:
         median = 1000 * np.median(self.results["time"], axis=(1, 3))
 
         f = plt.figure(figsize=(4, 3) if tight else (8, 9))
-        lineobjs = plt.loglog(np.array(self.n_elements), median[:, 0], zorder=10)
+        lineobjs = plt.plot(np.array(self.n_elements), median[:, 0], zorder=10)
         if median.shape[1] > 1:
             lineobjs += plt.loglog(np.array(self.n_elements), median[:, 1:])
 

@@ -1,9 +1,9 @@
 from cvxpnpl import pnp
 import numpy as np
 
-from pnp_synth import PnPSynth
-from null import pnp_null
-from suite import parse_arguments
+from toolkit.synth import PnPSynth
+from toolkit.null import pnp_null
+from toolkit.suite import parse_arguments
 
 
 class Baseline:
@@ -41,9 +41,10 @@ if __name__ == "__main__":
         quit()
 
     # run something
-    session = PnPSynth(methods=[Baseline, Null], n_runs=1000)
+    session = PnPSynth(methods=[Baseline, Null], n_runs=args.runs)
     session.run(n_elements=[8, 10, 12, 14, 16], noise=[0.0, 1.0, 2.0])
     if args.save:
         session.save(args.save)
     session.print_timings()
-    session.plot(tight=args.tight)
+    if not args.no_display:
+        session.plot(tight=args.tight)
