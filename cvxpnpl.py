@@ -15,6 +15,7 @@ def _point_constraints(pts_2d, pts_3d, K):
     K -- 3 x 3 np.array with the camera intrinsics
     """
     n = len(pts_3d)
+    zeros = np.zeros(n)
 
     # Expand arguments
     # points in 2D
@@ -34,47 +35,47 @@ def _point_constraints(pts_2d, pts_3d, K):
     Pzpy = Pz * py
     Pzpz = Pz * pz
 
-    c11 = np.zeros(n)
+    c11 = zeros
     c12 = -Pxpz
     c13 = Pxpy
-    c14 = np.zeros(n)
+    c14 = zeros
     c15 = -Pypz
     c16 = Pypy
-    c17 = np.zeros(n)
+    c17 = zeros
     c18 = -Pzpz
     c19 = Pzpy
 
     c21 = Pxpz
-    c22 = np.zeros(n)
+    c22 = zeros
     c23 = -Pxpx
     c24 = Pypz
-    c25 = np.zeros(n)
+    c25 = zeros
     c26 = -Pypx
     c27 = Pzpz
-    c28 = np.zeros(n)
+    c28 = zeros
     c29 = -Pzpx
 
     c31 = -Pxpy
     c32 = Pxpx
-    c33 = np.zeros(n)
+    c33 = zeros
     c34 = -Pypy
     c35 = Pypx
-    c36 = np.zeros(n)
+    c36 = zeros
     c37 = -Pzpy
     c38 = Pzpx
-    c39 = np.zeros(n)
+    c39 = zeros
 
-    n11 = np.zeros(n)
+    n11 = zeros
     n12 = -pz
     n13 = py
 
     n21 = pz
-    n22 = np.zeros(n)
+    n22 = zeros
     n23 = -px
 
     n31 = -py
     n32 = px
-    n33 = np.zeros(n)
+    n33 = zeros
 
     ## Compose block matrices for the equation system
     c1 = np.stack((c11, c12, c13, c14, c15, c16, c17, c18, c19), axis=1)
@@ -495,7 +496,7 @@ def pnp(pts_2d, pts_3d, K, eps=1e-9, max_iters=2500, verbose=False):
     C = np.vstack((C1, C2, C3))
     N = np.vstack((N1, N2, N3))
 
-    B = np.linalg.solve(N.T @ N, N.T) @ C
+    B = np.linalg.solve(N.T @ N, N.T @ C)
     A = C - N @ B
 
     # Solve the QCQP using shor's relaxation
