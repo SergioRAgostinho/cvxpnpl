@@ -2,4 +2,4 @@ cvxpnpl
 cycler
 matplotlib
 numpy
-opencv-python
+opencv - python

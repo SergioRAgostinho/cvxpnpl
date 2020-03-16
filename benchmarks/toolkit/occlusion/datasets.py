@@ -23,14 +23,14 @@ Model = namedtuple(
     ],
 )
 
-class Renderer:
 
+class Renderer:
     def __init__(
         self,
         use_gl_pose_convention=True,
         size=(640, 480),
         depth_limits=(20, 2000),
-        K=None
+        K=None,
     ):
 
         self._ctx = mgl.create_standalone_context()
@@ -48,21 +48,22 @@ class Renderer:
         # model storage
         self._models = {}
 
-
     @staticmethod
     def _init_mvm(K=None, size=(640, 480), depth_limits=(20, 2000)):
         if K is None:
-            K = np.array([
-                [572.41140, 0., 325.26110],
-                [0., 573.57043, 242.04899],
-                [0.,        0., 1.],
-            ])
+            K = np.array(
+                [
+                    [572.41140, 0.0, 325.26110],
+                    [0.0, 573.57043, 242.04899],
+                    [0.0, 0.0, 1.0],
+                ]
+            )
 
         # building the projection
-        fx = K[0,0]
-        fy = K[1,1]
-        cx = K[0,2]
-        cy = K[1,2]
+        fx = K[0, 0]
+        fy = K[1, 1]
+        cx = K[0, 2]
+        cy = K[1, 2]
 
         w = size[0]
         l = -cx
@@ -73,20 +74,26 @@ class Renderer:
         b = t - h
 
         near, far = depth_limits
-        proj = np.array([
-            [2*fx/w, 0.0, (r + l)/w, 0.0],
-            [0.0, -2 * fy/h, -(t + b)/h, 0.0],
-            [0.0, 0.0, - (far + near)/(far - near), -2 * far * near / (far - near)],
-            [0.0, 0.0, - 1.0, 0.0]
-        ])
+        proj = np.array(
+            [
+                [2 * fx / w, 0.0, (r + l) / w, 0.0],
+                [0.0, -2 * fy / h, -(t + b) / h, 0.0],
+                [
+                    0.0,
+                    0.0,
+                    -(far + near) / (far - near),
+                    -2 * far * near / (far - near),
+                ],
+                [0.0, 0.0, -1.0, 0.0],
+            ]
+        )
         return proj
-
 
     def init_programs(self):
 
         # object coordinates
         oc = self._ctx.program(
-            vertex_shader='''
+            vertex_shader="""
                 #version 330
 
                 in vec3 in_vert;
@@ -101,8 +108,8 @@ class Renderer:
                     gl_Position = mvp * vec4(in_vert, 1.0);
                     color = (in_vert - v_min)/(v_max - v_min);
                 }
-            ''',
-            fragment_shader='''
+            """,
+            fragment_shader="""
                 #version 330
 
                 in vec3 color;
@@ -113,9 +120,9 @@ class Renderer:
                     // f_color = vec4(color.rg, 0.5 + 0.5*color.b, 1);
                     f_color = vec4(color.rgb, 1);
                 }
-            ''')
+            """,
+        )
         return {"oc": oc}
-
 
     def object_coordinates(self, poses):
 
@@ -124,21 +131,24 @@ class Renderer:
         prog = self._prog["oc"]
 
         # Apply transformation between computer vision and opengl frame of reference
-        s = 2* int(self._use_gl_pose_convention) - 1
+        s = 2 * int(self._use_gl_pose_convention) - 1
         T = np.diag((1, s, s))
 
         for i, pose in poses.items():
             mvp = self.proj @ np.vstack((T @ pose, (0, 0, 0, 1)))
-            prog['mvp'].write(mvp.T.astype('f4').tobytes())
+            prog["mvp"].write(mvp.T.astype("f4").tobytes())
             model = self._models[str(i)]
-            prog['v_max'].write(model['max'].astype('f4').tobytes())
-            prog['v_min'].write(model['min'].astype('f4').tobytes())
+            prog["v_max"].write(model["max"].astype("f4").tobytes())
+            prog["v_min"].write(model["min"].astype("f4").tobytes())
 
-            self._ctx.simple_vertex_array(prog, model['vbo'], 'in_vert', index_buffer=model['ibo']).render()
+            self._ctx.simple_vertex_array(
+                prog, model["vbo"], "in_vert", index_buffer=model["ibo"]
+            ).render()
 
-        data = np.frombuffer(self._fbo.read(components=4), dtype=np.dtype('u1')).reshape((480, 640, 4))
+        data = np.frombuffer(
+            self._fbo.read(components=4), dtype=np.dtype("u1")
+        ).reshape((480, 640, 4))
         return data
-
 
     def load_models(self, models):
 
@@ -146,20 +156,15 @@ class Renderer:
 
             # Store everything
             d = {
-                'vbo': self._ctx.buffer(model.points.astype('f4').tobytes()),
-                'ibo': self._ctx.buffer(model.faces.astype('i4').tobytes()),
-                'min': model.min,
-                'max': model.min + model.size,
+                "vbo": self._ctx.buffer(model.points.astype("f4").tobytes()),
+                "ibo": self._ctx.buffer(model.faces.astype("i4").tobytes()),
+                "min": model.min,
+                "max": model.min + model.size,
             }
             self._models[model.id] = d
 
 
-
-
-
-
 class LinemodOcclusion:
-
     class _Sequence:
         def __init__(self, name, prefix, models, renderer):
 
@@ -174,10 +179,12 @@ class LinemodOcclusion:
             for k, v in gt.items():
                 poses = {}
                 for pose in v:
-                    poses[pose["obj_id"]] = np.hstack((
-                        np.array(pose["cam_R_m2c"]).reshape((3, 3)),
-                        np.array(pose["cam_t_m2c"]).reshape((3, 1)),
-                    ))
+                    poses[pose["obj_id"]] = np.hstack(
+                        (
+                            np.array(pose["cam_R_m2c"]).reshape((3, 3)),
+                            np.array(pose["cam_t_m2c"]).reshape((3, 1)),
+                        )
+                    )
                 self.poses[int(k)] = poses
 
             # iterator stuff
@@ -202,7 +209,15 @@ class LinemodOcclusion:
             # load visibility masks
             masks = {}
             for i, k in enumerate(poses.keys()):
-                masks[k] = np.array(Image.open(pjoin(self.prefix, "mask_visib", "{:06d}_{:06d}.png".format(self.i, i))))
+                masks[k] = np.array(
+                    Image.open(
+                        pjoin(
+                            self.prefix,
+                            "mask_visib",
+                            "{:06d}_{:06d}.png".format(self.i, i),
+                        )
+                    )
+                )
                 # import matplotlib.pyplot as plt
                 # plt.imshow(img); plt.show()
                 # import pdb; pdb.set_trace()
@@ -210,8 +225,12 @@ class LinemodOcclusion:
             # return dictionary object with rgb, depth and poses
             data = {
                 "id": self.i,
-                "rgb": np.array(Image.open(pjoin(self.prefix, "rgb", "{:06d}.png".format(self.i)))), # load rgb
-                "depth": np.array(Image.open(pjoin(self.prefix, "depth", "{:06d}.png".format(self.i)))), # load depth
+                "rgb": np.array(
+                    Image.open(pjoin(self.prefix, "rgb", "{:06d}.png".format(self.i)))
+                ),  # load rgb
+                "depth": np.array(
+                    Image.open(pjoin(self.prefix, "depth", "{:06d}.png".format(self.i)))
+                ),  # load depth
                 "masks": masks,
                 "oc": oc,
                 "poses": poses,
@@ -232,7 +251,6 @@ class LinemodOcclusion:
                 for n in seq_names
             ]
 
-
         def __iter__(self):
             return iter(self.sequences)
 
@@ -249,7 +267,9 @@ class LinemodOcclusion:
         # Handle Partitions
         # self.train = type(self)._Partition(pjoin(self.prefix, "train"))
         self.train = None
-        self.test = type(self)._Partition(pjoin(self.prefix, "test"), self.models, self.renderer)
+        self.test = type(self)._Partition(
+            pjoin(self.prefix, "test"), self.models, self.renderer
+        )
 
     def _parse_camera(self):
         data = json.loads(open(pjoin(self.prefix, "camera.json")).read())
@@ -321,8 +341,9 @@ if __name__ == "__main__":
     args = parse_arguments()
     ds = LinemodOcclusion(args.prefix)
 
-
     for sequence in ds.test:
         for frame in sequence:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
             pass

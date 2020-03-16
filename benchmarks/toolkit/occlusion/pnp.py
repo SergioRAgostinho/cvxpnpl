@@ -7,8 +7,8 @@ import numpy as np
 # from synth.pnp import *
 from suite import parse_arguments
 
-class PnPOcclusion:
 
+class PnPOcclusion:
     def __init__(self, prefix, timed=False):
 
         self.ds = LinemodOcclusion(prefix)
@@ -18,7 +18,6 @@ class PnPOcclusion:
         self.results = None
         self.frame_id = None
         self.object_id = None
-
 
 
 if __name__ == "__main__":

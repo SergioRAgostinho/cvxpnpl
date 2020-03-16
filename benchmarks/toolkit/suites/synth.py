@@ -2,6 +2,7 @@ import time
 import numpy as np
 from .suite import Suite
 
+
 class PnPSynth(Suite):
     def __init__(self, methods=None, n_runs=10, timed=True):
 

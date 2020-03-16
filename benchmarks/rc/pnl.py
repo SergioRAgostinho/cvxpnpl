@@ -1,18 +1,13 @@
 from cvxpnpl import pnl
 import numpy as np
 
-from toolkit.synth import PnLSynth
-from toolkit.suite import parse_arguments
-from toolkit.redundant_constraint import pnl_va
+from toolkit.methods.pnl import rc, CvxPnPL
+from toolkit.suites import parse_arguments, PnLSynth
 
 
-class Baseline:
+class Baseline(CvxPnPL):
 
     name = "baseline"
-
-    @staticmethod
-    def estimate_pose(line_2d, line_3d, K):
-        return pnl(line_2d, line_3d, K)
 
 
 class Stripped:
@@ -21,7 +16,7 @@ class Stripped:
 
     @staticmethod
     def estimate_pose(line_2d, line_3d, K):
-        return pnl_va(line_2d, line_3d, K)
+        return rc(line_2d, line_3d, K)
 
 
 if __name__ == "__main__":

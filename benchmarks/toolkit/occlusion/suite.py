@@ -1,7 +1,7 @@
 from datasets import LinemodOcclusion
 
-class Suite:
 
+class Suite:
     def __init__(self, prefix, timed=False):
 
         self.ds = LinemodOcclusion(prefix)

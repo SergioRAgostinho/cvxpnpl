@@ -1,18 +1,12 @@
-from cvxpnpl import pnp
 import numpy as np
 
-from toolkit.synth import PnPSynth
-from toolkit.null import pnp_null
-from toolkit.suite import parse_arguments
+from toolkit.methods.pnp import null, CvxPnPL
+from toolkit.suites import parse_arguments, PnPSynth
 
 
-class Baseline:
+class Baseline(CvxPnPL):
 
     name = "baseline"
-
-    @staticmethod
-    def estimate_pose(pts_2d, pts_3d, K):
-        return pnp(pts_2d, pts_3d, K)
 
 
 class Null:
@@ -21,7 +15,7 @@ class Null:
 
     @staticmethod
     def estimate_pose(pts_2d, pts_3d, K):
-        return pnp_null(pts_2d, pts_3d, K)
+        return null(pts_2d, pts_3d, K)
 
 
 if __name__ == "__main__":
