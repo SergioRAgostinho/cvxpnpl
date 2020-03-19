@@ -39,7 +39,7 @@ class CvxPnPL:
     name = "CvxPnPL"
 
     @staticmethod
-    def estimate_pose(line_2d, line_3d, K):
+    def estimate_pose(K, line_2d, line_3d):
         return pnl(line_2d, line_3d, K)
 
 
@@ -49,7 +49,7 @@ class EPnPL:
     loaded = _matlab is not None and _matlab.exist("EPnPLS_GN") > 0
 
     @staticmethod
-    def estimate_pose(line_2d, line_3d, K):
+    def estimate_pose(K, line_2d, line_3d):
 
         # the method needs at least 6 lines to work
         if len(line_2d) < 6:
@@ -78,7 +78,7 @@ class Mirzaei:
     loaded = _matlab is not None and _matlab.exist("mirzWrapper") > 0
 
     @staticmethod
-    def estimate_pose(line_2d, line_3d, K):
+    def estimate_pose(K, line_2d, line_3d):
 
         # compose line constraints
         xs, xe, Xs, Xe = VakhitovHelper.lines(line_2d, line_3d, K)
@@ -96,7 +96,7 @@ class OPnPL:
     loaded = _matlab is not None and _matlab.exist("OPnPL") > 0
 
     @staticmethod
-    def estimate_pose(line_2d, line_3d, K):
+    def estimate_pose(K, line_2d, line_3d):
 
         # compose all geometric constraints
         xxn = _matlab.double.empty(2, 0)
@@ -127,7 +127,7 @@ class Pluecker:
     loaded = _matlab is not None and _matlab.exist("plueckerWrapper") > 0
 
     @staticmethod
-    def estimate_pose(line_2d, line_3d, K):
+    def estimate_pose(K, line_2d, line_3d):
 
         # requires a minimum of 9 lines to work properly
         if len(line_2d) < 9:
@@ -150,7 +150,7 @@ class RPnL:
     loaded = _matlab is not None and _matlab.exist("PNLWrapper") > 0
 
     @staticmethod
-    def estimate_pose(line_2d, line_3d, K):
+    def estimate_pose(K, line_2d, line_3d):
 
         # compose line constraints
         xs, xe, Xs, Xe = VakhitovHelper.lines(line_2d, line_3d, K)

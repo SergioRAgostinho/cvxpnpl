@@ -14,7 +14,7 @@ class Null:
     name = "null"
 
     @staticmethod
-    def estimate_pose(pts_2d, pts_3d, K):
+    def estimate_pose(K, pts_2d, pts_3d):
         return null(pts_2d, pts_3d, K)
 
 

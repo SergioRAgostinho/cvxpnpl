@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from itertools import product
 import time
 
@@ -22,7 +23,25 @@ def aa2rm(aa):
     return R
 
 
-class SynthSuite(Suite):
+def random_pose():
+    """Instantiate a pose very similar to the conditions of the LINEMOD
+    dataset
+    """
+
+    # Generate random rotation
+    axis = np.random.random(3) - 0.5
+    axis /= np.linalg.norm(axis)
+
+    angle = 2 * np.pi * np.random.random(1)
+    aa = angle * axis
+    R = aa2rm(aa)
+
+    # Generate random translation
+    t = np.concatenate([np.random.random(2) - 0.5, 1.6 * np.random.random(1) + 0.6])
+    return R, t
+
+
+class SynthSuite(Suite, ABC):
 
     def __init__(self, methods=None, n_runs=10, timed=True):
         super().__init__(methods=methods, timed=timed)
@@ -49,32 +68,16 @@ class SynthSuite(Suite):
         n_methods = len(self.methods)
         n_el = len(n_elements)
         self.results = {
-            "angular": np.empty((n_el, n_noise, n_methods, self.n_runs)),
-            "translation": np.empty((n_el, n_noise, n_methods, self.n_runs)),
+            "angular": np.full((n_el, n_noise, n_methods, self.n_runs), np.nan),
+            "translation": np.full((n_el, n_noise, n_methods, self.n_runs), np.nan),
         }
         if self.timed:
-            self.results["time"] = np.empty((n_el, n_noise, n_methods, self.n_runs))
+            self.results["time"] = np.full((n_el, n_noise, n_methods, self.n_runs), np.nan)
 
 
-    def instantiate(self, n_pts):
-        """Instantiates a scenario very similar to the conditions of the LINEMOD
-        dataset
-        """
-
-        # create all points
-        pts = self.LENGTH * (np.random.random((n_pts, 3)) - 0.5)
-
-        # Generate random rotation
-        axis = np.random.random(3) - 0.5
-        axis /= np.linalg.norm(axis)
-
-        angle = 2 * np.pi * np.random.random(1)
-        aa = angle * axis
-        R = aa2rm(aa)
-
-        # Generate random translation
-        t = np.concatenate([np.random.random(2) - 0.5, 1.6 * np.random.random(1) + 0.6])
-        return pts, R, t
+    @abstractmethod
+    def generate_correspondences(self, n_elements, R, t, noise):
+        pass
 
 
     def plot(self, label, tight=False):
@@ -207,73 +210,6 @@ class SynthSuite(Suite):
             print(self.methods[i].name + ":", str(mean_times[i]) + "ms")
 
 
-
-
-    # def project_points(self, pts, R=np.eye(3), t=np.zeros(3)):
-    #     pts_ = (pts @ R.T + t) @ self.K.T
-    #     return (pts_ / pts_[:, -1, None])[:, :-1]
-
-
-
-
-class PnPSynth(SynthSuite):
-    def __init__(self, methods=None, n_runs=10, timed=True):
-
-        super().__init__(
-            methods=[CvxPnPl] if methods is None else methods,
-            n_runs=n_runs,
-            timed=timed,
-        )
-
-    def estimate_pose(self, method, pts_2d, pts_3d, groundtruth):
-
-        # time counting mechanism
-        start = time.time()
-
-        # run estimation method
-        poses = method.estimate_pose(self.K, pts_2d, pts_3d)
-
-        # elapsed time
-        elapsed = time.time() - start
-
-        # it can happen that certain realizations with fewer elements
-        # admit more than one valid pose. we use additional support points to
-        # disambiguate
-        if len(poses) == 1:
-            return poses[0], elapsed
-
-        # create support points
-        R_gt, t_gt = groundtruth
-        pts_s_3d, _, _ = self.instantiate(10 * len(pts_2d))
-        pts_s_2d = project_points(pts_s_3d, self.K, R_gt, t_gt)
-
-        # disambiguate poses
-        min_idx = 0
-        min_error = np.float("+inf")
-        for i, (R, t) in enumerate(poses):
-            pts_s_2d_e = project_points(pts_s_3d, self.K, R, t)
-            err = np.sum(np.linalg.norm(pts_s_2d - pts_s_2d_e, axis=1))
-            if err < min_error:
-                min_error = err
-                min_idx = i
-
-        return poses[min_idx], elapsed
-
-    def scenario(self, n_elements, noise):
-
-        pts_3d, R, t = self.instantiate(n_elements)
-        pts_2d = project_points(pts_3d, self.K, R, t)
-
-        # Add gaussian noise to pixel projections
-        pts_2d += np.random.normal(scale=noise, size=pts_2d.shape)
-        return pts_2d, pts_3d, R, t
-
-    def plot(self, tight=False):
-        super().plot("Points", tight=tight)
-
-    def plot_timings(self, tight=False):
-        super().plot_timings("Points", tight=tight)
-
     def run(self, n_elements=None, noise=None):
 
         # Allocate storage and other stuff
@@ -285,27 +221,22 @@ class PnPSynth(SynthSuite):
         i_prog = 0
 
         for i, n_el in enumerate(self.n_elements):
-            for j, noise_ in enumerate(self.noise):
+            for j, noise in enumerate(self.noise):
                 for l in range(self.n_runs):
 
-                    # instantiate environment
-                    pts_2d, pts_3d, R_gt, t_gt = self.scenario(
-                        n_elements=n_el, noise=noise_
-                    )
+                    # generate random pose
+                    R_gt, t_gt = random_pose()
+
+                    # generate correspondences
+                    correspondences = self.generate_correspondences(n_el, R_gt, t_gt, noise)
 
                     for k, method in enumerate(self.methods):
 
                         # estimate pose
-                        (R, t), elapsed_time = self.estimate_pose(
-                            method, pts_2d, pts_3d, groundtruth=(R_gt, t_gt)
-                        )
+                        (R, t), elapsed_time = self.estimate_pose(method, (R_gt, t_gt), self.K, **correspondences)
 
                         # Sanitize results
                         if np.any(np.isnan(R)) or np.any(np.isnan(t)):
-                            self.results["angular"][i, j, k, l] = np.nan
-                            self.results["translation"][i, j, k, l] = np.nan
-                            if self.timed:
-                                self.results["time"][i, j, k, l] = np.nan
                             continue
 
                         # store error results in the object
@@ -326,52 +257,30 @@ class PnPSynth(SynthSuite):
         print("\rProgress: 100%", flush=True)
 
 
+class PnPSynth(SynthSuite):
+
+    def generate_correspondences(self, n_elements, R, t, noise):
+        # create all points
+        pts_3d = self.LENGTH * (np.random.random((n_elements, 3)) - 0.5)
+        pts_2d = project_points(pts_3d, self.K, R, t)
+
+        # Add gaussian noise to pixel projections
+        pts_2d += np.random.normal(scale=noise, size=pts_2d.shape)
+        return {"pts_2d": pts_2d, "pts_3d": pts_3d}
+
+    def plot(self, tight=False):
+        super().plot("Points", tight=tight)
+
+    def plot_timings(self, tight=False):
+        super().plot_timings("Points", tight=tight)
+
+
+
 class PnLSynth(SynthSuite):
-    def __init__(self, methods=None, n_runs=10, timed=True):
 
-        super().__init__(
-            methods=[CvxPnPl] if methods is None else methods,
-            n_runs=n_runs,
-            timed=timed,
-        )
-
-    def estimate_pose(self, method, line_2d, line_3d, groundtruth):
-
-        # time counting mechanism
-        start = time.time()
-
-        # run estimation method
-        poses = method.estimate_pose(line_2d, line_3d, self.K)
-
-        # elapsed time
-        elapsed = time.time() - start
-
-        # it can happen that certain realizations with fewer elements
-        # admit more than one valid pose. we use additional support points to
-        # disambiguate
-        if len(poses) == 1:
-            return poses[0], elapsed
-
-        # create support points
-        R_gt, t_gt = groundtruth
-        pts_s_3d, _, _ = self.instantiate(10 * len(line_2d))
-        pts_s_2d = project_points(pts_s_3d, self.K, R_gt, t_gt)
-
-        # disambiguate poses
-        min_idx = 0
-        min_error = np.float("+inf")
-        for i, (R, t) in enumerate(poses):
-            pts_s_2d_e = project_points(pts_s_3d, self.K, R, t)
-            err = np.sum(np.linalg.norm(pts_s_2d - pts_s_2d_e, axis=1))
-            if err < min_error:
-                min_error = err
-                min_idx = i
-
-        return poses[min_idx], elapsed
-
-    def scenario(self, n_elements, noise):
-
-        pts_3d, R, t = self.instantiate(2 * n_elements)
+    def generate_correspondences(self, n_elements, R, t, noise):
+        # create all points
+        pts_3d = self.LENGTH * (np.random.random((2*n_elements, 3)) - 0.5)
         pts_2d = project_points(pts_3d, self.K, R, t)
 
         # Add gaussian noise to pixel projections
@@ -385,113 +294,25 @@ class PnLSynth(SynthSuite):
 
         # Organized as 3x2x2 tensor. Lines x points x pixels
         line_2d = pts_2d.reshape((n_elements, 2, 2))
-        return line_2d, line_3d, R, t
+        return {"line_2d": line_2d, "line_3d": line_3d}
 
     def plot(self, tight=False):
         super().plot("Lines", tight)
 
-    def run(self, n_elements=None, noise=None):
-
-        # Allocate storage and other stuff
-        self.init_run(n_elements, noise)
-
-        # Some printing aids
-        print("Progress:   0%", end="", flush=True)
-        n_prog = len(self.n_elements) * len(self.noise) * self.n_runs
-        i_prog = 0
-
-        for i, n_el in enumerate(self.n_elements):
-            for j, noise_ in enumerate(self.noise):
-                for l in range(self.n_runs):
-
-                    # instantiate environment
-                    line_2d, line_3d, R_gt, t_gt = self.scenario(
-                        n_elements=n_el, noise=noise_
-                    )
-
-                    for k, method in enumerate(self.methods):
-
-                        # estimate pose
-                        (R, t), elapsed_time = self.estimate_pose(
-                            method, line_2d, line_3d, groundtruth=(R_gt, t_gt)
-                        )
-
-                        # Sanitize results
-                        if np.any(np.isnan(R)) or np.any(np.isnan(t)):
-                            self.results["angular"][i, j, k, l] = np.nan
-                            self.results["translation"][i, j, k, l] = np.nan
-                            if self.timed:
-                                self.results["time"][i, j, k, l] = np.nan
-                            continue
-
-                        # store error results in the object
-                        ang, trans = compute_pose_error((R_gt, t_gt), (R, t))
-
-                        self.results["angular"][i, j, k, l] = ang
-                        self.results["translation"][i, j, k, l] = trans
-                        if self.timed:
-                            self.results["time"][i, j, k, l] = elapsed_time
-
-                    i_prog += 1
-                    print(
-                        "\rProgress: {:>3d}%".format(int(i_prog * 100 / n_prog)),
-                        end="",
-                        flush=True,
-                    )
-
-        print("\rProgress: 100%", flush=True)
+    def plot_timings(self, tight=False):
+        super().plot_timings("Lines", tight=tight)
 
 
 class PnPLSynth(SynthSuite):
-    def __init__(self, methods=None, n_runs=10, timed=True):
 
-        super().__init__(
-            methods=[CvxPnPl] if methods is None else methods,
-            n_runs=n_runs,
-            timed=timed,
-        )
-
-    def estimate_pose(self, method, pts_2d, line_2d, pts_3d, line_3d, groundtruth):
-
-        # time counting mechanism
-        start = time.time()
-
-        # run estimation method
-        poses = method.estimate_pose(pts_2d, line_2d, pts_3d, line_3d, self.K)
-
-        # elapsed time
-        elapsed = time.time() - start
-
-        # it can happen that certain realizations with fewer elements
-        # admit more than one valid pose. we use additional support points to
-        # disambiguate
-        if len(poses) == 1:
-            return poses[0], elapsed
-
-        # create support points
-        R_gt, t_gt = groundtruth
-        pts_s_3d, _, _ = self.instantiate(10 * (len(pts_2d) + 2 * len(line_2d)))
-        pts_s_2d = project_points(pts_s_3d, self.K, R_gt, t_gt)
-
-        # disambiguate poses
-        min_idx = 0
-        min_error = np.float("+inf")
-        for i, (R, t) in enumerate(poses):
-            pts_s_2d_e = project_points(pts_s_3d, self.K, R, t)
-            err = np.sum(np.linalg.norm(pts_s_2d - pts_s_2d_e, axis=1))
-            if err < min_error:
-                min_error = err
-                min_idx = i
-
-        return poses[min_idx], elapsed
-
-    def scenario(self, n_elements, noise):
+    def generate_correspondences(self, n_elements, R, t, noise):
 
         # We need to ensure at least 1 point and 1 line
         n_p = np.random.randint(1, n_elements)
         n_l = n_elements - n_p
 
-        pts_3d, R, t = self.instantiate(n_p + 2 * n_l)
+        # create all points
+        pts_3d = self.LENGTH * (np.random.random((n_p + 2 * n_l, 3)) - 0.5)
         pts_2d = project_points(pts_3d, self.K, R, t)
 
         # Add gaussian noise to pixel projections
@@ -505,63 +326,11 @@ class PnPLSynth(SynthSuite):
 
         # Organized as 3x2x2 tensor. Lines x points x pixels
         line_2d = pts_2d[n_p:].reshape((n_l, 2, 2))
-        return pts_2d[:n_p], line_2d, pts_3d[:n_p], line_3d, R, t
+        return {"pts_2d" : pts_2d[:n_p], "line_2d" : line_2d, "pts_3d" : pts_3d[:n_p], "line_3d" : line_3d}
 
     def plot(self, tight=False):
         super().plot("Points and Lines", tight)
 
-    def run(self, n_elements=None, noise=None):
+    def plot_timings(self, tight=False):
+        super().plot_timings("Points and Lines", tight=tight)
 
-        # Allocate storage and other stuff
-        self.init_run(n_elements, noise)
-
-        # Some printing aids
-        print("Progress:   0%", end="", flush=True)
-        n_prog = len(self.n_elements) * len(self.noise) * self.n_runs
-        i_prog = 0
-
-        for i, n_el in enumerate(self.n_elements):
-            for j, noise_ in enumerate(self.noise):
-                for l in range(self.n_runs):
-
-                    # instantiate environment
-                    pts_2d, line_2d, pts_3d, line_3d, R_gt, t_gt = self.scenario(
-                        n_elements=n_el, noise=noise_
-                    )
-
-                    for k, method in enumerate(self.methods):
-
-                        # estimate pose
-                        (R, t), elapsed_time = self.estimate_pose(
-                            method,
-                            pts_2d,
-                            line_2d,
-                            pts_3d,
-                            line_3d,
-                            groundtruth=(R_gt, t_gt),
-                        )
-
-                        # Sanitize results
-                        if np.any(np.isnan(R)) or np.any(np.isnan(t)):
-                            self.results["angular"][i, j, k, l] = np.nan
-                            self.results["translation"][i, j, k, l] = np.nan
-                            if self.timed:
-                                self.results["time"][i, j, k, l] = np.nan
-                            continue
-
-                        # store error results in the object
-                        ang, trans = compute_pose_error((R_gt, t_gt), (R, t))
-
-                        self.results["angular"][i, j, k, l] = ang
-                        self.results["translation"][i, j, k, l] = trans
-                        if self.timed:
-                            self.results["time"][i, j, k, l] = elapsed_time
-
-                    i_prog += 1
-                    print(
-                        "\rProgress: {:>3d}%".format(int(i_prog * 100 / n_prog)),
-                        end="",
-                        flush=True,
-                    )
-
-        print("\rProgress: 100%", flush=True)

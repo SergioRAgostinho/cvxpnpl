@@ -15,7 +15,7 @@ class Stripped:
     name = "stripped"
 
     @staticmethod
-    def estimate_pose(line_2d, line_3d, K):
+    def estimate_pose(K, line_2d, line_3d):
         return rc(line_2d, line_3d, K)
 
 

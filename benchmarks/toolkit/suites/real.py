@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from time import time
 
 import cv2
 import numpy as np
@@ -56,41 +55,6 @@ class RealSuite(Suite, ABC):
     def extract_correspondences(self, oid, frame, features, model):
         pass
 
-    def estimate_pose(self, method, groundtruth, K, **kwargs):
-
-        # time counting mechanism
-        start = time()
-
-        # run estimation method
-        poses = method.estimate_pose(K, **kwargs)
-
-        # elapsed time
-        elapsed = time() - start
-
-        # it can happen that certain realizations with fewer elements
-        # admit more than one valid pose. we use additional support points to
-        # disambiguate
-        if len(poses) == 0:
-            return (np.full((3, 3), np.nan), np.full(3, np.nan)), np.nan
-        elif len(poses) == 1:
-            return poses[0], elapsed
-
-        # create support points to disambiguate multiple poses
-        R_gt, t_gt = groundtruth
-        pts_s_3d = np.random.random((20, 3)) - 0.5
-        pts_s_2d = project_points(pts_s_3d, K, R_gt, t_gt)
-
-        # disambiguate poses
-        min_idx = 0
-        min_error = np.float("+inf")
-        for i, (R, t) in enumerate(poses):
-            pts_s_2d_e = project_points(pts_s_3d, K, R, t)
-            err = np.sum(np.linalg.norm(pts_s_2d - pts_s_2d_e, axis=1))
-            if err < min_error:
-                min_error = err
-                min_idx = i
-
-        return poses[min_idx], elapsed
 
     def run(self, data):
 

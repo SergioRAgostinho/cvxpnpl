@@ -51,7 +51,7 @@ class CvxPnPL:
     name = "CvxPnPL"
 
     @staticmethod
-    def estimate_pose(pts_2d, line_2d, pts_3d, line_3d, K):
+    def estimate_pose(K, pts_2d, line_2d, pts_3d, line_3d):
         return pnpl(pts_2d, line_2d, pts_3d, line_3d, K)
 
 
@@ -61,7 +61,7 @@ class DLT:
     loaded = _matlab is not None and _matlab.exist("DLT") > 0
 
     @staticmethod
-    def estimate_pose(pts_2d, line_2d, pts_3d, line_3d, K):
+    def estimate_pose(K, pts_2d, line_2d, pts_3d, line_3d):
 
         # compose all geometric constraints
         xxn, XXw = VakhitovHelper.points(pts_2d, pts_3d, K)
@@ -80,7 +80,7 @@ class EPnPL:
     loaded = _matlab is not None and _matlab.exist("EPnPLS_GN") > 0
 
     @staticmethod
-    def estimate_pose(pts_2d, line_2d, pts_3d, line_3d, K):
+    def estimate_pose(K, pts_2d, line_2d, pts_3d, line_3d):
 
         # requires a minimum of 6 elements
         if (len(line_2d) + len(pts_2d)) < 6:
@@ -107,7 +107,7 @@ class OPnPL:
     loaded = _matlab is not None and _matlab.exist("OPnPL") > 0
 
     @staticmethod
-    def estimate_pose(pts_2d, line_2d, pts_3d, line_3d, K):
+    def estimate_pose(K, pts_2d, line_2d, pts_3d, line_3d):
 
         # compose all geometric constraints
         xxn, XXw = VakhitovHelper.points(pts_2d, pts_3d, K)

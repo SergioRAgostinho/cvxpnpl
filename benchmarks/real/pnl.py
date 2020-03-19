@@ -7,7 +7,8 @@ from toolkit.datasets import Linemod, Occlusion
 # to move later
 from toolkit.suites import parse_arguments, RealSuite
 
-class PnPReal(RealSuite):
+# class PnPReal(RealSuite):
+#     pass
 
 # reproducibility is a great thing
 np.random.seed(0)
