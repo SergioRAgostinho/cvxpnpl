@@ -149,3 +149,18 @@ The same usage applies to all other scripts exported by the benchmarks.
 
 ## Real Data
 
+Downloaded linemod and linemod occlusion datasets for bop
+https://bop.felk.cvut.cz/datasets/
+
+Requires installing custom fork of OpenCV
+SIFT is disabled by default. LSD was removed in version something
+
+The current python packaging does not provide support for xfeatures so we need to compile from source to manually enable these
+
+Based of release 4.2.0
+Changed LSD code to status in 
+
+```
+$ mkdir build install && cd build
+$ cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install -DOPENCV_ENABLE_NONFREE=ON -DOPENCV_EXTRA_MODULES_PATH=<opencv_contrib>/modules -DBUILD_LIST="imgproc,xfeatures2d,python3" -DPYTHON3_PACKAGES_PATH=/home/sergio/.miniconda3/envs/cvxpnpl-dev/lib/python3.6/site-packages
+```

@@ -17,6 +17,7 @@ except ModuleNotFoundError:
 
 
 # init matlab
+# _matlab = None
 _matlab = init_matlab()
 
 
@@ -87,7 +88,9 @@ class CvxPnPL:
     name = "CvxPnPL"
 
     @staticmethod
-    def estimate_pose(pts_2d, pts_3d, K):
+    def estimate_pose(K, pts_2d, pts_3d):
+        if len(pts_2d) < 3:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
         return pnp(pts_2d, pts_3d, K)
 
 
@@ -96,7 +99,11 @@ class EPnP:
     name = "EPnP"
 
     @staticmethod
-    def estimate_pose(pts_2d, pts_3d, K):
+    def estimate_pose(K, pts_2d, pts_3d):
+
+        # doesn't work with less than 4 points
+        if len(pts_2d) < 4:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
 
         _, rvec, tvec = cv2.solvePnP(
             objectPoints=pts_3d.astype(float),
@@ -115,7 +122,7 @@ class OPnP:
     loaded = _matlab is not None and _matlab.exist("OPnP") > 0
 
     @staticmethod
-    def estimate_pose(pts_2d, pts_3d, K):
+    def estimate_pose(K, pts_2d, pts_3d):
 
         # compose point variables constraints
         xxn, XXw = VakhitovHelper.points(pts_2d, pts_3d, K)
@@ -143,7 +150,7 @@ class UPnP:
     loaded = upnp is not None
 
     @staticmethod
-    def estimate_pose(pts_2d, pts_3d, K):
+    def estimate_pose(K, pts_2d, pts_3d):
 
         # compute bearing vectors
         n = len(pts_3d)

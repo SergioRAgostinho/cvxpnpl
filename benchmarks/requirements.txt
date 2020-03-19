@@ -1,5 +1,9 @@
 cvxpnpl
 cycler
 matplotlib
+moderngl
 numpy
-opencv - python
+opencv-python
+pandas
+Pillow
+plymit

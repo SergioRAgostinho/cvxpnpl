@@ -91,7 +91,11 @@ class EPnPL:
         xs, xe, Xs, Xe = VakhitovHelper.lines(line_2d, line_3d, K)
 
         # Invoke method on matlab
-        R, t = _matlab.EPnPLS_GN(XXw, xxn, xs, xe, Xs, Xe, nargout=2)
+        try:
+            # SVD occasionally is exploding
+            R, t = _matlab.EPnPLS_GN(XXw, xxn, xs, xe, Xs, Xe, nargout=2)
+        except:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
 
         # Cast to numpy types
         return [(np.array(R), np.array(t).ravel())]
