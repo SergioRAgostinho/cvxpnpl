@@ -3,16 +3,134 @@ from abc import ABC, abstractmethod
 import cv2
 import numpy as np
 import pandas as pd
+from skimage.draw import line as raster_line
 
 from .suite import Suite, project_points, compute_pose_error
 
+# delete me
+import matplotlib.pyplot as plt
+
 
 def compute_3d_coordinates(oc, pts, model):
+    if not len(pts):
+        return np.empty((0, 3))
+
     colors = oc[pts[:, 1], pts[:, 0]]
     if np.any(colors[:, -1] != 255):
         raise NotImplementedError("The object coordinate masks have issues")
 
     return colors[:, :3] * model.size / 255 + model.min
+
+
+def draw_lines(lines, img, color):
+
+    paths = np.concatenate(
+        [
+            np.stack(
+                raster_line(line[0, 1], line[0, 0], line[1, 1], line[1, 0]), axis=-1
+            )
+            for line in lines
+        ]
+    )
+    out = img.copy()
+    out[paths[:, 0], paths[:, 1]] = color
+    return out
+
+
+def extract_sift_keypoints(rgb):
+    gray = cv2.cvtColor(rgb[:, :, :3], cv2.COLOR_RGB2GRAY)
+    sift = cv2.xfeatures2d.SIFT_create()
+    detections = sift.detect(gray, None)
+
+    # store unique keypoints
+    keypoints = np.unique(
+        np.array([kp.pt for kp in detections]).astype(np.uint32), axis=0
+    )
+    return keypoints
+
+
+def extract_line_segments(rgb):
+    gray = cv2.cvtColor(rgb[:, :, :3], cv2.COLOR_RGB2GRAY)
+    ld = cv2.line_descriptor.LSDDetector_createLSDDetector()
+    keylines = ld.detect(gray, 1, 1)
+
+    paths = []
+    idx = []
+    for i, keyline in enumerate(keylines):
+        start = np.round(keyline.getStartPoint()).astype(int)
+        end = np.round(keyline.getEndPoint()).astype(int)
+
+        path = np.stack(raster_line(start[1], start[0], end[1], end[0]), axis=-1)
+        paths.append(path)
+        idx.append(np.full(len(path), i))
+
+    paths = np.concatenate(paths)
+    idx = np.concatenate(idx)
+
+    # ensure max bounds are not overstepped
+    max_bound = np.array(rgb.shape[:2]) - 1
+    paths = np.minimum(paths, max_bound)
+    return paths, idx
+
+
+def extract_point_correspondences(oid, frame, keypoints, model):
+    # filter keypoints to object mask and object coordinate data
+    pts_2d = keypoints[
+        np.logical_and(
+            frame["mask"][keypoints[:, 1], keypoints[:, 0]] == oid,
+            frame["oc"][keypoints[:, 1], keypoints[:, 0], -1] == 255,
+        )
+    ]
+
+    # objects get the corresponding object coordinates
+    pts_3d = compute_3d_coordinates(frame["oc"], pts_2d, model)
+    return pts_2d, pts_3d
+
+
+def extract_line_correspondences(oid, frame, lines, model):
+    paths, idx = lines
+
+    # prune line segments to masks. assume masks are convex
+    mask = np.logical_and(frame["mask"] == oid, frame["oc"][:, :, -1] == 255)
+    line_2d = []
+    for pid in range(idx[-1]):
+
+        path = paths[idx == pid]
+        if not np.any(mask[path[:, 0], path[:, 1]]):
+            continue
+
+        line = np.empty((2, 2), dtype=int)
+
+        # clamp at start and at the end
+        start, end = None, None
+        for i, (r, c) in enumerate(path):
+            if mask[r, c]:
+                line[0] = (c, r)
+                start = i
+                break
+
+        for i, (r, c) in enumerate(reversed(path)):
+            if mask[r, c]:
+                line[1] = (c, r)
+                end = len(path) - i
+                break
+
+        # Reject very small segments
+        if end - start < 5:
+            continue
+
+        line_2d.append(line)
+    line_2d = np.array(line_2d)  # array can cope with empty lists
+
+    # # debug
+    # img = draw_lines(line_2d, frame["rgb"], np.array([255, 255, 255], dtype=np.uint8))
+    # plt.imshow(img); plt.show()
+
+    # # objects get the corresponding object coordinates
+    line_3d = compute_3d_coordinates(
+        frame["oc"], line_2d.reshape(-1, 2), model
+    ).reshape(-1, 2, 3)
+    return line_2d, line_3d
 
 
 class RealSuite(Suite, ABC):
@@ -55,7 +173,6 @@ class RealSuite(Suite, ABC):
     def extract_correspondences(self, oid, frame, features, model):
         pass
 
-
     def run(self, data):
 
         self.init_run(data)
@@ -79,6 +196,20 @@ class RealSuite(Suite, ABC):
 
                     # Iterate through each object in frame
                     for oid, pose in frame["poses"].items():
+
+                        # plt.imsave(f'/tmp/images/{seq.name:02d}_{frame["id"]:04d}.m.png', frame["mask"])
+                        # plt.imsave(f'/tmp/images/{seq.name:02d}_{frame["id"]:04d}.o.png', frame["oc"])
+
+                        mmask = frame["mask"].astype(bool)
+                        moc = frame["oc"][:, :, -1] == 255
+                        iou = np.sum(np.logical_and(mmask, moc)) / np.sum(
+                            np.logical_or(mmask, moc)
+                        )
+
+                        # there are legit occlusion cases lower than 0.6 iou
+                        if iou < 0.5:
+                            error_msg = "IoU issues between mask and object coordinates"
+                            raise RuntimeError(error_msg)
 
                         # extract correspondences
                         correspondences = self.extract_correspondences(
@@ -192,22 +323,36 @@ class RealSuite(Suite, ABC):
 
 
 class PnPReal(RealSuite):
-
     def extract_features(self, rgb):
-        gray = cv2.cvtColor(rgb[:, :, :3], cv2.COLOR_RGB2GRAY)
-        sift = cv2.xfeatures2d.SIFT_create()
-        detections = sift.detect(gray, None)
-
-        # store unique keypoints
-        keypoints = np.unique(
-            np.array([kp.pt for kp in detections]).astype(np.uint32), axis=0
-        )
-        return keypoints
+        return extract_sift_keypoints(rgb)
 
     def extract_correspondences(self, oid, frame, keypoints, model):
-        # filter keypoints to object mask
-        pts_2d = keypoints[frame["mask"][keypoints[:, 1], keypoints[:, 0]] == oid]
-
-        # objects get the corresponding object coordinates
-        pts_3d = compute_3d_coordinates(frame["oc"], pts_2d, model)
+        pts_2d, pts_3d = extract_point_correspondences(oid, frame, keypoints, model)
         return {"pts_2d": pts_2d, "pts_3d": pts_3d}
+
+
+class PnLReal(RealSuite):
+    def extract_features(self, rgb):
+        return extract_line_segments(rgb)
+
+    def extract_correspondences(self, oid, frame, lines, model):
+        line_2d, line_3d = extract_line_correspondences(oid, frame, lines, model)
+        return {"line_2d": line_2d, "line_3d": line_3d}
+
+
+class PnPLReal(RealSuite):
+    def extract_features(self, rgb):
+        keypoints = extract_sift_keypoints(rgb)
+        keylines = extract_line_segments(rgb)
+        return keypoints, keylines
+
+    def extract_correspondences(self, oid, frame, features, model):
+        keypoints, keylines = features
+        pts_2d, pts_3d = extract_point_correspondences(oid, frame, keypoints, model)
+        line_2d, line_3d = extract_line_correspondences(oid, frame, keylines, model)
+        return {
+            "pts_2d": pts_2d,
+            "pts_3d": pts_3d,
+            "line_2d": line_2d,
+            "line_3d": line_3d,
+        }

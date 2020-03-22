@@ -34,7 +34,6 @@ def compute_pose_error(groundtruth, estimate):
 
 
 class Suite:
-
     def __init__(self, methods, timed=True):
         # store simulation properties
         self.methods = type(self).filter_methods(methods)
@@ -44,7 +43,6 @@ class Suite:
 
         # Are we benchamrking speed
         self.timed = timed
-
 
     @staticmethod
     def filter_methods(methods):
@@ -63,17 +61,13 @@ class Suite:
 
         return filtered
 
-
     @staticmethod
     def load(path):
         return pickle.load(open(path, "rb"))
 
-
-
     def save(self, path):
         pickle.dump(self, open(path, "wb"))
         print("Saved data to:", path)
-
 
     def estimate_pose(self, method, groundtruth, K, **kwargs):
 
@@ -110,4 +104,3 @@ class Suite:
                 min_idx = i
 
         return poses[min_idx], elapsed
-

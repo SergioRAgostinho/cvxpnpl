@@ -27,7 +27,6 @@ def init_matlab():
     return _matlab_engine
 
 
-
 class VakhitovHelper:
     """Utility functions to prepare inputs for what is requested
     by functions in Vakhitov's pnpl toolbox. We adopt the same naming

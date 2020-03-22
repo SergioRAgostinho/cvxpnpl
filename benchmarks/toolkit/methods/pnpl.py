@@ -52,6 +52,9 @@ class CvxPnPL:
 
     @staticmethod
     def estimate_pose(K, pts_2d, line_2d, pts_3d, line_3d):
+        # requires a minimum of 3 elements
+        if (len(line_2d) + len(pts_2d)) < 3:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
         return pnpl(pts_2d, line_2d, pts_3d, line_3d, K)
 
 

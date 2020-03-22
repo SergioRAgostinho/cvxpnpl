@@ -40,6 +40,11 @@ class CvxPnPL:
 
     @staticmethod
     def estimate_pose(K, line_2d, line_3d):
+        # the method needs at least 6 lines to work
+        if len(line_2d) < 3:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
+
+        # with np.errstate(divide='raise'):
         return pnl(line_2d, line_3d, K)
 
 
@@ -79,6 +84,10 @@ class Mirzaei:
 
     @staticmethod
     def estimate_pose(K, line_2d, line_3d):
+
+        # the method needs at least 3 lines to work
+        if len(line_2d) < 3:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
 
         # compose line constraints
         xs, xe, Xs, Xe = VakhitovHelper.lines(line_2d, line_3d, K)
@@ -151,6 +160,10 @@ class RPnL:
 
     @staticmethod
     def estimate_pose(K, line_2d, line_3d):
+
+        # the method needs at least 4 lines to work
+        if len(line_2d) < 4:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
 
         # compose line constraints
         xs, xe, Xs, Xe = VakhitovHelper.lines(line_2d, line_3d, K)

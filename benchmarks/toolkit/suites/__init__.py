@@ -4,6 +4,7 @@ from .suite import *
 from .synth import *
 from .real import *
 
+
 def parse_arguments():
 
     parser = argparse.ArgumentParser()
@@ -29,5 +30,9 @@ def parse_arguments():
         help="Number of runs each scenario is instantiated.",
     )
 
-    parser.add_argument("--datasets-prefix", default="data", help="Specifies the prefix folder holding all datasets. If no single folder exists, consider creating one with the aid of symbolic links.")
+    parser.add_argument(
+        "--datasets-prefix",
+        default="data",
+        help="Specifies the prefix folder holding all datasets. If no single folder exists, consider creating one with the aid of symbolic links.",
+    )
     return parser.parse_args()

@@ -82,7 +82,6 @@ def rc(pts_2d, pts_3d, K, eps=1e-9, max_iters=2500, verbose=False):
     return _solve_relaxation_rc(A, B, eps=eps, max_iters=max_iters, verbose=verbose)
 
 
-
 class CvxPnPL:
 
     name = "CvxPnPL"
@@ -124,11 +123,19 @@ class OPnP:
     @staticmethod
     def estimate_pose(K, pts_2d, pts_3d):
 
+        # trying to prevent blowups
+        if len(pts_2d) < 3:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
+
         # compose point variables constraints
         xxn, XXw = VakhitovHelper.points(pts_2d, pts_3d, K)
 
         # Invoke method on matlab
-        Rs, ts = _matlab.OPnP(XXw, xxn, nargout=2)
+        try:
+            # SVD occasionally is exploding
+            Rs, ts = _matlab.OPnP(XXw, xxn, nargout=2)
+        except:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
         Rs, ts = np.array(Rs), np.array(ts)
 
         # Detect if there's no multiple solutions
@@ -151,6 +158,10 @@ class UPnP:
 
     @staticmethod
     def estimate_pose(K, pts_2d, pts_3d):
+
+        # trying to prevent blowups
+        if len(pts_2d) < 3:
+            return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
 
         # compute bearing vectors
         n = len(pts_3d)

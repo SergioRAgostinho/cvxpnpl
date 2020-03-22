@@ -1,8 +1,13 @@
 import moderngl as mgl
 import numpy as np
 
+# delete me
+import logging
+
 # We only need a single stand alone context
 _ctx = None
+
+
 def _get_global_context():
     global _ctx
     if _ctx is None:
@@ -74,7 +79,6 @@ class Renderer:
         )
         return proj
 
-
     def init_programs(self):
 
         # object coordinates
@@ -122,6 +126,7 @@ class Renderer:
         T = np.diag((1, s, s))
 
         for i, pose in poses.items():
+            # logging.debug(f"Object {i}\nPose:\n{pose}")
             mvp = self.proj @ np.vstack((T @ pose, (0, 0, 0, 1)))
             prog["mvp"].write(mvp.T.astype("f4").tobytes())
             model = self._models[i]

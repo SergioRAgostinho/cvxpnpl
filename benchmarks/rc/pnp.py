@@ -18,7 +18,6 @@ class Stripped:
         return rc(pts_2d, pts_3d, K)
 
 
-
 # reproducibility is a great thing
 np.random.seed(0)
 np.random.seed(42)

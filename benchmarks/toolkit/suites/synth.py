@@ -9,6 +9,7 @@ from matplotlib.ticker import PercentFormatter
 
 from .suite import Suite, project_points, compute_pose_error
 
+
 def aa2rm(aa):
     """Construct a rotation matrix from an axis angle representation"""
     angle = np.linalg.norm(aa)
@@ -42,7 +43,6 @@ def random_pose():
 
 
 class SynthSuite(Suite, ABC):
-
     def __init__(self, methods=None, n_runs=10, timed=True):
         super().__init__(methods=methods, timed=timed)
         # Kinect V1 intrinsics
@@ -56,7 +56,6 @@ class SynthSuite(Suite, ABC):
         self.n_runs = n_runs
         self.noise = None
         self.n_elements = [4]
-
 
     def init_run(self, n_elements, noise):
 
@@ -72,13 +71,13 @@ class SynthSuite(Suite, ABC):
             "translation": np.full((n_el, n_noise, n_methods, self.n_runs), np.nan),
         }
         if self.timed:
-            self.results["time"] = np.full((n_el, n_noise, n_methods, self.n_runs), np.nan)
-
+            self.results["time"] = np.full(
+                (n_el, n_noise, n_methods, self.n_runs), np.nan
+            )
 
     @abstractmethod
     def generate_correspondences(self, n_elements, R, t, noise):
         pass
-
 
     def plot(self, label, tight=False):
         """Generate plots"""
@@ -155,7 +154,6 @@ class SynthSuite(Suite, ABC):
         )
         plt.show()
 
-
     def plot_timings(self, label, tight=False):
 
         if not self.timed:
@@ -167,12 +165,12 @@ class SynthSuite(Suite, ABC):
         style_cycler = cycler(color=colors, marker=markers_all[: len(self.methods)])
         plt.rc("axes", prop_cycle=style_cycler)
 
-        median = 1000 * np.median(self.results["time"], axis=(1, 3))
+        median = 1000 * np.nanmean(self.results["time"], axis=(1, 3))
 
         f = plt.figure(figsize=(4, 3) if tight else (8, 9))
         lineobjs = plt.plot(np.array(self.n_elements), median[:, 0], zorder=10)
         if median.shape[1] > 1:
-            lineobjs += plt.loglog(np.array(self.n_elements), median[:, 1:])
+            lineobjs += plt.plot(np.array(self.n_elements), median[:, 1:])
 
         plt.xlabel(label)
         plt.ylabel("Runtime (ms)")
@@ -199,7 +197,6 @@ class SynthSuite(Suite, ABC):
         )
         plt.show()
 
-
     def print_timings(self):
         if not self.timed:
             warnings.warn("Timinings were not logged for this class. Doing nothing.")
@@ -208,7 +205,6 @@ class SynthSuite(Suite, ABC):
         mean_times = 1000 * np.nanmean(self.results["time"], axis=(0, 1, 3))
         for i in range(len(mean_times)):
             print(self.methods[i].name + ":", str(mean_times[i]) + "ms")
-
 
     def run(self, n_elements=None, noise=None):
 
@@ -228,12 +224,16 @@ class SynthSuite(Suite, ABC):
                     R_gt, t_gt = random_pose()
 
                     # generate correspondences
-                    correspondences = self.generate_correspondences(n_el, R_gt, t_gt, noise)
+                    correspondences = self.generate_correspondences(
+                        n_el, R_gt, t_gt, noise
+                    )
 
                     for k, method in enumerate(self.methods):
 
                         # estimate pose
-                        (R, t), elapsed_time = self.estimate_pose(method, (R_gt, t_gt), self.K, **correspondences)
+                        (R, t), elapsed_time = self.estimate_pose(
+                            method, (R_gt, t_gt), self.K, **correspondences
+                        )
 
                         # Sanitize results
                         if np.any(np.isnan(R)) or np.any(np.isnan(t)):
@@ -258,7 +258,6 @@ class SynthSuite(Suite, ABC):
 
 
 class PnPSynth(SynthSuite):
-
     def generate_correspondences(self, n_elements, R, t, noise):
         # create all points
         pts_3d = self.LENGTH * (np.random.random((n_elements, 3)) - 0.5)
@@ -275,12 +274,10 @@ class PnPSynth(SynthSuite):
         super().plot_timings("Points", tight=tight)
 
 
-
 class PnLSynth(SynthSuite):
-
     def generate_correspondences(self, n_elements, R, t, noise):
         # create all points
-        pts_3d = self.LENGTH * (np.random.random((2*n_elements, 3)) - 0.5)
+        pts_3d = self.LENGTH * (np.random.random((2 * n_elements, 3)) - 0.5)
         pts_2d = project_points(pts_3d, self.K, R, t)
 
         # Add gaussian noise to pixel projections
@@ -304,7 +301,6 @@ class PnLSynth(SynthSuite):
 
 
 class PnPLSynth(SynthSuite):
-
     def generate_correspondences(self, n_elements, R, t, noise):
 
         # We need to ensure at least 1 point and 1 line
@@ -326,11 +322,15 @@ class PnPLSynth(SynthSuite):
 
         # Organized as 3x2x2 tensor. Lines x points x pixels
         line_2d = pts_2d[n_p:].reshape((n_l, 2, 2))
-        return {"pts_2d" : pts_2d[:n_p], "line_2d" : line_2d, "pts_3d" : pts_3d[:n_p], "line_3d" : line_3d}
+        return {
+            "pts_2d": pts_2d[:n_p],
+            "line_2d": line_2d,
+            "pts_3d": pts_3d[:n_p],
+            "line_3d": line_3d,
+        }
 
     def plot(self, tight=False):
         super().plot("Points and Lines", tight)
 
     def plot_timings(self, tight=False):
         super().plot_timings("Points and Lines", tight=tight)
-

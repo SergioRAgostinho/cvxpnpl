@@ -29,7 +29,6 @@ Camera = namedtuple("Camera", ["K", "size"])
 
 
 class Dataset:
-
     def __init__(self, prefix):
         print("Initializing " + type(self).__name__)
         self.prefix = prefix
@@ -66,7 +65,6 @@ class Dataset:
         renderer.load_models(list(self.models.values()))
         return renderer
 
-
     def _parse_camera(self):
         data = json.loads(open(pjoin(self.prefix, "camera.json")).read())
         camera = Camera(
@@ -76,7 +74,6 @@ class Dataset:
             size=(data["width"], data["height"]),
         )
         return camera
-
 
     def _load_models(self):
 
@@ -130,7 +127,6 @@ class Dataset:
         print("DONE", flush=True)
         return models
 
-
     class _Partition:
         def __init__(self, prefix, models, renderer):
 
@@ -139,6 +135,7 @@ class Dataset:
             self.renderer = renderer
 
             seq_names = sorted([d.name for d in os.scandir(prefix)])
+            # seq_names = [seq_names[1]]
             self.sequences = [
                 Dataset._Sequence(int(n), pjoin(prefix, n), models, renderer)
                 for n in seq_names
@@ -154,7 +151,6 @@ class Dataset:
 
         def __len__(self):
             return len(self.sequences)
-
 
     class _Sequence:
         def __init__(self, name, prefix, models, renderer):
@@ -207,9 +203,9 @@ class Dataset:
                 "rgb": np.array(
                     Image.open(pjoin(self.prefix, "rgb", "{:06d}.png".format(self.i)))
                 ),  # load rgb
-                "depth": np.array(
-                    Image.open(pjoin(self.prefix, "depth", "{:06d}.png".format(self.i)))
-                ),  # load depth
+                # "depth": np.array(
+                #     Image.open(pjoin(self.prefix, "depth", "{:06d}.png".format(self.i)))
+                # ),  # load depth
                 "mask": mask,
                 "oc": oc,
                 "poses": poses,
@@ -237,7 +233,5 @@ class Linemod(Dataset):
 
 
 class Occlusion(Dataset):
-
     def __init__(self, prefix):
         super().__init__(pjoin(prefix, "lmo"))
-

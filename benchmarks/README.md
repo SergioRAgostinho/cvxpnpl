@@ -5,6 +5,7 @@ cvxpnpl was benchmarked on both both synthetic and real environments, stand-alon
 The folder structure is organized as follows:
 - `null`: produces results for the null space search alternative strategy arguing on the value of formulating the problem as an SDP. Produces the plots in Figure 4;
 - `rc`: produces results for the discussion on the inclusion of the redundant constraint. Produces the plots in Figure 3;
+- `real`: compares `cvxpnpl` against other methods evaluating them on the LINEMOD and Occlusion datasets;
 - `scalability`: evaluates the execution runtime scalability with an increasing number of points. Produces the plots in Figure 5;
 - `synth`: compares `cvxpnpl` against other methods. Produces the plots in Figure 6;
 - `toolkit`: a supporting package which includes common routines and support classes used by all benchmarks.
@@ -12,8 +13,10 @@ The folder structure is organized as follows:
 ## Table of Contents
 
 1. [3rd Party Setup](#3rd-party-setup)
-	1. [Installing OpenGV](#installing-opengv)
-	2. [Installing the Companion Toolbox from Vakhitov et al. 2016](#installing-the-companion-toolbox-from-vakhitov-et-al-2016)
+	1. [Downloading Data](#downloading-data)
+	2. [Installing OpenCV](#installing-opencv)
+	2. [Installing OpenGV](#installing-opengv)
+	3. [Installing the Companion Toolbox from Vakhitov et al. 2016](#installing-the-companion-toolbox-from-vakhitov-et-al-2016)
 		1. [Setting up the Python engine for MATLAB](#setting-up-the-python-engine-for-matlab)
 		2. [Installing the PnPL Toolbox](http://localhost:6419/#installing-the-pnpl-toolbox)
 2. [Running the Benchmarks](#running-the-benchmarks)
@@ -26,15 +29,55 @@ The synthetic data experiments validate cvxpnpl against of numerous random reali
  -->
 ## 3rd Party Setup
 
-I only considered mandatory dependencies, packages which are being distributed through PyPi/pip. Everything else is considered optional. Each benchmark will evaluate at runtime if all dependencies are met and warn the user is something is missing.
+I only considered mandatory dependencies, packages which are being distributed through PyPi/pip. Everything else is considered optional (well OpenCV is still being treated as mandatory). Each benchmark will evaluate at runtime if all dependencies are met and warn the user is something is missing.
 
 1. Install all pip dependencies. From the root folder invoke
 	```
 	cd benchmarks
 	pip install -r requirements.txt
 	```
+2. Download all supporting dataset. [More detailed info here](#downloading-data).
+2. Compile and install the python bindings for [OpenCV](https://github.com/opencv/opencv.git). [More detailed info here](#installing-opencv).
 2. Compile and install the python bindings for [OpenGV](https://github.com/laurentkneip/opengv). [More detailed info here](#installing-opengv).
 3. Install the companion [toolbox](https://github.com/alexandervakhitov/pnpl) from [Vakhitov et al. 2016](https://link.springer.com/chapter/10.1007/978-3-319-46478-7_36). [More detailed info here](#installing-the-companion-toolbox-from-vakhitov-et-al-2016).
+
+### Downloading Data
+
+The real data benchmarks make use of the LINEMOD and Occlusion (linemod-occluded) datasets as distributed in the [Benchmark for 6D Object Pose Estimation](https://bop.felk.cvut.cz/datasets/) challenge. Be sure to download both datasets to the same folder as to recreate the following folder structure.
+```
+<prefix>
+├── lm
+│   ├── models
+│   ├── models_eval
+│   ├── test
+│   └── train
+└── lmo
+    ├── models
+    ├── models_eval
+    ├── test
+    └── train
+```
+
+You can symlink `<prefix>` as `cvxpnpl/benchmarks/data` to avoid having the pass it datasets' folder prefix as an argument.
+
+### Installing OpenCV
+
+The version of OpenCV distributed through pypi does not come with all the features with require enabled and as such, it needs to be compiled from source and installed. Furthermore, the benchmarks rely on a Line Segment Detector from OpenCV to extract line segments. This class was removed from OpenCV between version 3.4.5-3.4.6 and 4.0.1-4.1.0. In order to have access to it, we're restricted to use version 4.0.1 or earlier. Only version 4.0.1 was actually tested. (At this point it is prudent to run things inside a virtual environment.)
+
+```
+$ git clone https://github.com/opencv/opencv.git
+$ git clone https://github.com/opencv/opencv_contrib.git
+$ cd opencv_contrib && git checkout 4.0.1 && cd ..
+$ mkdir opencv/build opencv/install && cd opencv/build
+$ cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install -DOPENCV_ENABLE_NONFREE=ON -DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules -DBUILD_LIST="calib3d,imgproc,line_descriptor,python3,xfeatures2d"
+$ make install
+```
+
+Assuming your python 3 installation was picked up correctly, by the end of the steps above, OpenCV should be visible from inside python. To test it run
+```
+$ python -c "import cv2; print(cv2.line_descriptor.LSDDetector_createLSDDetector())"
+<line_descriptor_LSDDetector 0x7fab4f4a6cd0>
+```
 
 ### Installing OpenGV
 
@@ -65,9 +108,6 @@ In this section I will provide some guiding steps (for Unix style systems) on ho
 
 This [MATLAB toolbox](https://github.com/alexandervakhitov/pnpl), which accompanied the main [paper](https://link.springer.com/chapter/10.1007/978-3-319-46478-7_36), implements a number of useful PnP, PnL and PnPL methods. As you might have guessed, we are now in MATLAB territory. Using this toolbox requires you to have a somewhat recent MATLAB installation. The interface between MATLAB and Python is done through MATLAB's Python engine and each MATLAB version exports a Python engine compiled against a few versions of Python. I.e. **the version of MATLAB you're using will place a requirement on the Python versions you can use**.
 
-```
-$ export MATLABPATH="$(find /usr/stud/agostinh/Development/3rdparty/pnpl -type d -follow -print | tr '\n' ':')"
-````
 
 #### Setting up the Python engine for MATLAB
 
@@ -116,6 +156,11 @@ $ export MATLABPATH="$(find /usr/stud/agostinh/Development/3rdparty/pnpl -type d
 	addpath(genpath('<path_to_pnpl>'));
 	```
 	**Don't forget to replace `<path_to>` with the correct folder**.
+	Alternatively, you can also export the following environmental variable
+	```
+	$ export MATLABPATH="$(find <path_to_pnpl> -type d -follow -not -path "*+*" -not -path "*.git*" -print | tr '\n' ':'):$MATLABPATH"
+	```
+
 5. Test it
 	```
 	$ matlab -nodisplay -nojvm -r "help OPnP; exit"
@@ -127,40 +172,27 @@ $ export MATLABPATH="$(find /usr/stud/agostinh/Development/3rdparty/pnpl -type d
 
 ## Running the Benchmarks
 
-Running the benchmarks should be performed from with **the `benchmarks` folder as the current working directory**. It made no sense properly install the auxiliary `toolkit` just because of benchmarks, so this is a small price to pay.
+Running the benchmarks should be performed with **the `benchmarks` folder as the current working directory**. It made no sense properly install the auxiliary `toolkit` just because of benchmarks, so this is a small price to pay.
 
 
-To run the benchmarks you just need to run the corresponding Python script and after the computations are complete, the results will be plotted. In case you wish to save the benchmark results, invoke the `--save` optional switch and to restore a previously saved session to display its results, the `--load` switch is available. For a detailed example of the command check the usage and options below
+To run the benchmarks you just need to run the corresponding Python script and after the computations are complete, the results will be plotted or printed to the terminal, depending on the benchmark. In case you wish to save the benchmark results, invoke the `--save` optional switch and to restore a previously saved session to display its results, the `--load` switch is available. For a detailed example of the command check the usage and options below
 
 ```
 $ python synth/pnp.py -h
 usage: pnp.py [-h] [--save SAVE | --load LOAD] [--tight | --no-display]
-              [--runs RUNS]
+              [--runs RUNS] [--datasets-prefix DATASETS_PREFIX]
 
 optional arguments:
-  -h, --help    show this help message and exit
-  --save SAVE   File path to store the session data.
-  --load LOAD   File path to load and plot session data.
-  --tight       Show tight figures.
-  --no-display  Don't display any figures.
-  --runs RUNS   Number of runs each scenario is instantiated.
+  -h, --help            show this help message and exit
+  --save SAVE           File path to store the session data.
+  --load LOAD           File path to load and plot session data.
+  --tight               Show tight figures.
+  --no-display          Don't display any figures.
+  --runs RUNS           Number of runs each scenario is instantiated.
+  --datasets-prefix DATASETS_PREFIX
+                        Specifies the prefix folder holding all datasets. If
+                        no single folder exists, consider creating one with
+                        the aid of symbolic links.
 ```
 The same usage applies to all other scripts exported by the benchmarks.
 
-## Real Data
-
-Downloaded linemod and linemod occlusion datasets for bop
-https://bop.felk.cvut.cz/datasets/
-
-Requires installing custom fork of OpenCV
-SIFT is disabled by default. LSD was removed in version something
-
-The current python packaging does not provide support for xfeatures so we need to compile from source to manually enable these
-
-Based of release 4.2.0
-Changed LSD code to status in 
-
-```
-$ mkdir build install && cd build
-$ cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install -DOPENCV_ENABLE_NONFREE=ON -DOPENCV_EXTRA_MODULES_PATH=<opencv_contrib>/modules -DBUILD_LIST="imgproc,xfeatures2d,python3" -DPYTHON3_PACKAGES_PATH=/home/sergio/.miniconda3/envs/cvxpnpl-dev/lib/python3.6/site-packages
-```

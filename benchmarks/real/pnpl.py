@@ -1,7 +1,7 @@
 import numpy as np
 
-from toolkit.methods.pnl import CvxPnPL, EPnPL, Mirzaei, OPnPL, Pluecker, RPnL
-from toolkit.suites import parse_arguments, PnLReal
+from toolkit.methods.pnpl import CvxPnPL, DLT, EPnPL, OPnPL
+from toolkit.suites import parse_arguments, PnPLReal
 from toolkit.datasets import Linemod, Occlusion
 
 
@@ -15,12 +15,12 @@ args = parse_arguments()
 
 # Just a loading data scenario
 if args.load:
-    session = PnLReal.load(args.load)
+    session = PnPLReal.load(args.load)
     session.print()
     quit()
 
 # run something
-session = PnLReal(methods=[CvxPnPL, EPnPL, Mirzaei, OPnPL, Pluecker, RPnL])
+session = PnPLReal(methods=[CvxPnPL, DLT, EPnPL, OPnPL])
 session.run(data=[Linemod(args.datasets_prefix), Occlusion(args.datasets_prefix)])
 # session.run(data=[Linemod(args.datasets_prefix)])
 if args.save:
