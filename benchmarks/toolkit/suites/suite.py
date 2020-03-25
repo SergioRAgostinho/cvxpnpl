@@ -74,8 +74,12 @@ class Suite:
         # time counting mechanism
         start = time()
 
-        # run estimation method
-        poses = method.estimate_pose(K, **kwargs)
+        poses = None
+        try:
+            # run estimation method
+            poses = method.estimate_pose(K, **kwargs)
+        except:
+            return (np.full((3, 3), np.nan), np.full(3, np.nan)), np.nan
 
         # elapsed time
         elapsed = time() - start

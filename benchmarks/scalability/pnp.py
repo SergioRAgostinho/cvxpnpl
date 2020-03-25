@@ -19,7 +19,7 @@ args = parse_arguments()
 # Just a loading data scenario
 if args.load:
     session = PnPSynth.load(args.load)
-    session.plot_timings(tight=args.tight)
+    session.plot_timings(legend=False, tight=args.tight)
     quit()
 
 # run something

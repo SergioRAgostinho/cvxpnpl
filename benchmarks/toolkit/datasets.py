@@ -228,10 +228,32 @@ class Dataset:
 
 
 class Linemod(Dataset):
+
+    seq_names = [
+        "ape",
+        "benchvise",
+        "bowl",
+        "cam",
+        "can",
+        "cat",
+        "cup",
+        "driller",
+        "duck",
+        "eggbox",
+        "glue",
+        "holepuncher",
+        "iron",
+        "lamp",
+        "phone",
+    ]
+
     def __init__(self, prefix):
         super().__init__(pjoin(prefix, "lm"))
 
 
 class Occlusion(Dataset):
+
+    seq_names = [""]
+
     def __init__(self, prefix):
         super().__init__(pjoin(prefix, "lmo"))

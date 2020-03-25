@@ -107,12 +107,25 @@ class SynthSuite(Suite, ABC):
             color=colors, marker=markers_all[: len(self.methods)]
         ) * cycler(linestyle=linestyle_all[: len(self.noise)])
 
+        # figure out legend size dynamically
+        nm = len(self.methods)
+        nc = nm
+        for i in range(1, nm):
+            nc = nm // i
+            if nc < 5:
+                break
+
+        # increse figure size
+        if nc != nm:
+            w, h = f.get_size_inches()
+            f.set_size_inches((w, h + (nm // nc) * 0.54))
+
         for i, ax in enumerate(axes):
             # (elements, noise, methods, runs)
             results = self.results[data_t[i]]
             median = np.nanmedian(results, axis=3)
             if i == 1:
-                median /= 0.01  # % representation for angles
+                median /= 0.01  # % representation for translation in percentage
                 ax.yaxis.set_major_formatter(PercentFormatter(decimals=1))
 
             # (elements, noise, methods)
@@ -140,21 +153,19 @@ class SynthSuite(Suite, ABC):
         for ax in axes:
             # Shrink current axis's height by 10% on the bottom
             box = ax.get_position()
-            comp = 0.7 if tight else 0.85
+            comp = 0.85
+            if tight:
+                comp = 0.7 - 0.14 * (np.round(nm / nc) - 1)
             ax.set_position(
                 [box.x0, box.y0 + box.height * (1 - comp), box.width, box.height * comp]
             )
 
         f.legend(
-            lineobjs,
-            labels,
-            loc="lower center",
-            bbox_to_anchor=(0.5, 0.05),
-            ncol=len(self.methods),
+            lineobjs, labels, loc="lower center", bbox_to_anchor=(0.5, 0.05), ncol=nc,
         )
         plt.show()
 
-    def plot_timings(self, label, tight=False):
+    def plot_timings(self, label, legend=True, tight=False):
 
         if not self.timed:
             warnings.warn("Timinings were not logged for this class. Doing nothing.")
@@ -165,7 +176,7 @@ class SynthSuite(Suite, ABC):
         style_cycler = cycler(color=colors, marker=markers_all[: len(self.methods)])
         plt.rc("axes", prop_cycle=style_cycler)
 
-        median = 1000 * np.nanmean(self.results["time"], axis=(1, 3))
+        median = 1000 * np.nanmedian(self.results["time"], axis=(1, 3))
 
         f = plt.figure(figsize=(4, 3) if tight else (8, 9))
         lineobjs = plt.plot(np.array(self.n_elements), median[:, 0], zorder=10)
@@ -180,21 +191,22 @@ class SynthSuite(Suite, ABC):
         if tight:
             plt.tight_layout()
 
-        # Shrink current axis's height by 10% on the bottom
-        ax = plt.gca()
-        box = ax.get_position()
-        comp = 0.80 if tight else 0.85
-        ax.set_position(
-            [box.x0, box.y0 + box.height * (1 - comp), box.width, box.height * comp]
-        )
+        if legend:
+            # Shrink current axis's height by 10% on the bottom
+            ax = plt.gca()
+            box = ax.get_position()
+            comp = 0.80 if tight else 0.85
+            ax.set_position(
+                [box.x0, box.y0 + box.height * (1 - comp), box.width, box.height * comp]
+            )
 
-        f.legend(
-            lineobjs,
-            [m.name for m in self.methods],
-            loc="lower center",
-            bbox_to_anchor=(0.5, 0.05),
-            ncol=len(self.methods),
-        )
+            f.legend(
+                lineobjs,
+                [m.name for m in self.methods],
+                loc="lower center",
+                bbox_to_anchor=(0.5, 0.05),
+                ncol=len(self.methods),
+            )
         plt.show()
 
     def print_timings(self):
@@ -270,8 +282,8 @@ class PnPSynth(SynthSuite):
     def plot(self, tight=False):
         super().plot("Points", tight=tight)
 
-    def plot_timings(self, tight=False):
-        super().plot_timings("Points", tight=tight)
+    def plot_timings(self, legend=True, tight=False):
+        super().plot_timings("Points", legend, tight)
 
 
 class PnLSynth(SynthSuite):
@@ -296,8 +308,8 @@ class PnLSynth(SynthSuite):
     def plot(self, tight=False):
         super().plot("Lines", tight)
 
-    def plot_timings(self, tight=False):
-        super().plot_timings("Lines", tight=tight)
+    def plot_timings(self, legend=True, tight=False):
+        super().plot_timings("Lines", legend, tight)
 
 
 class PnPLSynth(SynthSuite):
@@ -332,5 +344,5 @@ class PnPLSynth(SynthSuite):
     def plot(self, tight=False):
         super().plot("Points and Lines", tight)
 
-    def plot_timings(self, tight=False):
-        super().plot_timings("Points and Lines", tight=tight)
+    def plot_timings(self, legend=True, tight=False):
+        super().plot_timings("Points and Lines", legend, tight)

@@ -20,7 +20,7 @@ if args.load:
 
 # run something
 session = PnLSynth(
-    methods=[CvxPnPL, EPnPL, Mirzaei, OPnPL, Pluecker, RPnL], n_runs=args.runs
+    methods=[CvxPnPL, EPnPL, OPnPL, Mirzaei, Pluecker, RPnL], n_runs=args.runs
 )
 session.run(n_elements=[4, 6, 8, 10, 12], noise=[0.0, 1.0, 2.0])
 if args.save:

@@ -269,7 +269,7 @@ class RealSuite(Suite, ABC):
         if self.timed:
             self.results["time"] = np.stack(self.results["time"])
 
-    def print(self):
+    def _aggregate_results(self):
 
         # build tables for angular error, translation errors, timings and nan counts
         angular = []
@@ -280,31 +280,40 @@ class RealSuite(Suite, ABC):
         dids = []
         sids = []
 
+        # filter out all nans
+        good_mask = np.logical_not(
+            np.logical_or.reduce(np.isnan(self.results["angular"]).T)
+        )
+
         # Looping over datasets
         for did, ds in enumerate(self.data):
             for sid, seq in enumerate(ds):
 
                 dids.append(type(ds).__name__)
-                sids.append(str(seq.name))
+                # sids.append(str(seq.name))
+                sids.append(type(ds).seq_names[sid])
 
-                mask = np.logical_and(self.did == did, self.sid == sid)
+                mask_with_nans = np.logical_and(self.did == did, self.sid == sid)
+                mask = np.logical_and(mask_with_nans, good_mask)
 
                 angular.append(np.nanmedian(self.results["angular"][mask], axis=0))
                 translation.append(
                     np.nanmedian(self.results["translation"][mask], axis=0)
                 )
-                nans.append(np.sum(np.isnan(self.results["angular"][mask]), axis=0))
+                nans.append(
+                    np.sum(np.isnan(self.results["angular"][mask_with_nans]), axis=0)
+                )
                 if self.timed:
                     timings.append(np.nanmean(self.results["time"][mask], axis=0))
 
         # last row is over the entire data set
-        angular.append(np.nanmedian(self.results["angular"], axis=0))
-        translation.append(np.nanmedian(self.results["translation"], axis=0))
+        angular.append(np.nanmedian(self.results["angular"][good_mask], axis=0))
+        translation.append(np.nanmedian(self.results["translation"][good_mask], axis=0))
         nans.append(np.sum(np.isnan(self.results["angular"]), axis=0))
         if self.timed:
-            timings.append(np.nanmean(self.results["time"], axis=0))
-        dids.append("all")
-        sids.append("all")
+            timings.append(np.nanmean(self.results["time"][good_mask], axis=0))
+        # dids.append("all")
+        # sids.append("all")
 
         # Aggregate
         angular = np.stack(angular)
@@ -312,14 +321,67 @@ class RealSuite(Suite, ABC):
         timings = np.stack(timings)
         nans = np.stack(nans)
 
+        return angular, translation, timings, nans, dids, sids
+
+    def print(self, mode=None):
+
+        angular, translation, timings, nans, dids, sids = self._aggregate_results()
+
         # build pandas table for pretty rendering
-        for data in [angular, translation, timings, nans]:
+        for data, name, scale in zip(
+            [angular, translation, timings, nans],
+            [
+                "Angular Error (°)",
+                "Translation Error (%)",
+                "Average Runtime (ms)",
+                "NaN Counts",
+            ],
+            [1.0, 100.0, 1000.0, 1],
+        ):
+            print(name)
             df = pd.DataFrame(
-                data,
-                index=[d + " seq: " + s for d, s, in zip(dids, sids)],
+                data * scale,
+                index=[d + " " + s for d, s, in zip(dids, sids)] + ["All"],
                 columns=[m.__name__ for m in self.methods],
             )
-            print(df)
+            if mode is None or mode == "console":
+                print(df, "\n")
+            elif mode == "latex":
+                print(df.to_latex(), "\n")
+            else:
+                raise RuntimeError("Unknown mode '" + str(mode) + "'")
+
+        # Combined angle and translation
+        print("Angular Error (°) / Translation Error (‰)")
+        str_format = np.frompyfunc(lambda x: f"{np.round(x, 3):.3f}", 1, 1)
+        data = str_format(np.stack([angular, translation], axis=-1) * (1.0, 1000.0))
+        if mode == "latex":
+            # highlight the best
+            bf_format = np.frompyfunc(lambda x: f"\\textbf{{{x}}}", 1, 1)
+            best_angular = np.argmin(angular, axis=1)
+            sidx = list(range(len(data)))
+            data[sidx, best_angular, 0] = bf_format(data[sidx, best_angular, 0])
+
+            best_translation = np.argmin(translation, axis=1)
+            # import pdb; pdb.set_trace()
+            data[sidx, best_translation, 1] = bf_format(data[sidx, best_translation, 1])
+        data = data[:, :, 0] + " / " + data[:, :, 1]
+        df = pd.DataFrame(
+            data,
+            index=[d[:4] + " " + s for d, s, in zip(dids, sids)] + ["All"],
+            columns=[
+                m.__name__ + " \\textdegree/\\textperthousand"
+                if mode == "latex"
+                else " (° / ‰)"
+                for m in self.methods
+            ],
+        )
+        if mode is None or mode == "console":
+            print(df, "\n")
+        elif mode == "latex":
+            print(df.to_latex(escape=False), "\n")
+        else:
+            raise RuntimeError("Unknown mode '" + str(mode) + "'")
 
 
 class PnPReal(RealSuite):

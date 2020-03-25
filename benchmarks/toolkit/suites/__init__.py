@@ -35,4 +35,11 @@ def parse_arguments():
         default="data",
         help="Specifies the prefix folder holding all datasets. If no single folder exists, consider creating one with the aid of symbolic links.",
     )
+
+    parser.add_argument(
+        "--print-mode",
+        default=None,
+        choices=["console", "latex"],
+        help="Specializes the printing to console to generate LaTeX friendly tables.",
+    )
     return parser.parse_args()

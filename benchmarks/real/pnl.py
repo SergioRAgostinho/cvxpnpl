@@ -16,7 +16,7 @@ args = parse_arguments()
 # Just a loading data scenario
 if args.load:
     session = PnLReal.load(args.load)
-    session.print()
+    session.print(args.print_mode)
     quit()
 
 # run something

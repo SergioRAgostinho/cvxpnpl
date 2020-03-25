@@ -16,12 +16,13 @@ args = parse_arguments()
 # Just a loading data scenario
 if args.load:
     session = PnPReal.load(args.load)
-    session.print()
+    session.print(args.print_mode)
     quit()
 
 # run something
 session = PnPReal(methods=[CvxPnPL, EPnP, OPnP, UPnP])
 session.run(data=[Linemod(args.datasets_prefix), Occlusion(args.datasets_prefix)])
+# session.run(data=[Occlusion(args.datasets_prefix)])
 if args.save:
     session.save(args.save)
 session.print()

@@ -19,7 +19,7 @@ if args.load:
     quit()
 
 # run something
-session = PnPLSynth(methods=[CvxPnPL, DLT, EPnPL, OPnPL], n_runs=args.runs)
+session = PnPLSynth(methods=[CvxPnPL, EPnPL, OPnPL, DLT], n_runs=args.runs)
 session.run(n_elements=[4, 6, 8, 10, 12], noise=[0.0, 1.0, 2.0])
 if args.save:
     session.save(args.save)
