@@ -3,7 +3,7 @@ import numpy as np
 from scipy.sparse import csc_matrix
 import scs
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 
 def _point_constraints(pts_2d, pts_3d, K):
@@ -456,8 +456,10 @@ def _solve_relaxation(A, B, eps=1e-9, max_iters=2500, verbose=False):
     Z = _vech10_inv(results["x"])
     if np.any(np.isnan(Z)):
         if verbose:
-            warnings.warn("The SDP solver did not return a valid solution. Increasing max_iters might solve the issue.")
-        return [(np.full((3,3), np.nan), np.full(3, np.nan))]
+            warnings.warn(
+                "The SDP solver did not return a valid solution. Increasing max_iters might solve the issue."
+            )
+        return [(np.full((3, 3), np.nan), np.full(3, np.nan))]
     vals, vecs = np.linalg.eigh(Z)
 
     # check for rank
@@ -468,14 +470,18 @@ def _solve_relaxation(A, B, eps=1e-9, max_iters=2500, verbose=False):
     else:
         r_c = _constraint_ortho_det(vecs, rank)
 
-    poses = []
-    for r in r_c:
-        # Retrieve rotation and translation
-        U, _, Vh = np.linalg.svd(r.reshape((3, 3)).T)
-        R = U @ Vh
-        t = -B @ R.ravel("F")
-        poses.append((R, t))
-    return poses
+    # project to valid rotation spaces
+    U, _, Vh = np.linalg.svd(r_c.reshape(-1, 3, 3))
+    R = U @ Vh
+    r = R.reshape(-1, 9)
+    t = -r @ B.T
+
+    # Optimality guarantees
+    res = r @ A.T
+    if np.any(np.abs(np.sum(res * res, axis=-1) - results["info"]["dobj"]) > eps):
+        not_certifiable = "The solution is not certifiably optimal."
+        warnings.warn(not_certifiable)
+    return list(zip(R.transpose(0, 2, 1), t))
 
 
 def pnp(pts_2d, pts_3d, K, eps=1e-9, max_iters=2500, verbose=False):
