@@ -3,7 +3,7 @@ import numpy as np
 from scipy.sparse import csc_matrix
 import scs
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 
 def _point_constraints(pts_2d, pts_3d, K):
