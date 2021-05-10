@@ -1,5 +1,27 @@
+import ast
+from ast import NodeVisitor
 from setuptools import setup
-from cvxpnpl import __version__
+
+
+class VersionExtractor(NodeVisitor):
+    def __init__(self):
+        super().__init__()
+        self.version = None
+
+    def visit_Assign(self, node):
+        if hasattr(node.targets[0], "id") and node.targets[0].id == "__version__":
+            self.version = node.value.s
+
+
+def parse_version():
+
+    with open("cvxpnpl.py", "r") as f:
+        content = f.read()
+
+    tree = ast.parse(content)
+    visitor = VersionExtractor()
+    visitor.visit(tree)
+    return visitor.version
 
 
 def install_requires():
@@ -19,7 +41,7 @@ def long_description():
 
 setup(
     name="cvxpnpl",
-    version=__version__,
+    version=parse_version(),
     license="Apache 2.0",
     description="A convex Perspective-n-Points-and-Lines method.",
     long_description=long_description(),
