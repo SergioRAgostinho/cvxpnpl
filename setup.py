@@ -24,16 +24,6 @@ def parse_version():
     return visitor.version
 
 
-def install_requires():
-    """Generate list with dependency requirements"""
-
-    deps = []
-    with open("requirements.txt", "r") as f:
-        for line in f:
-            deps.append(line[:-1])
-    return deps
-
-
 def long_description():
     with open("README.md", "r") as f:
         return f.read()
@@ -46,7 +36,7 @@ setup(
     description="A convex Perspective-n-Points-and-Lines method.",
     long_description=long_description(),
     long_description_content_type="text/markdown",
-    install_requires=install_requires(),
+    install_requires=["numpy", "scipy", "scs>=2.0.0"],
     author="Sérgio Agostinho",
     author_email="sergio@sergioagostinho.com",
     url="https://github.com/SergioRAgostinho/cvxpnpl",
