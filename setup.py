@@ -36,7 +36,7 @@ setup(
     description="A convex Perspective-n-Points-and-Lines method.",
     long_description=long_description(),
     long_description_content_type="text/markdown",
-    install_requires=["numpy", "scipy", "scs>=2.0.0"],
+    install_requires=["packaging", "numpy", "scipy", "scs>=2.0.0"],
     author="Sérgio Agostinho",
     author_email="sergio@sergioagostinho.com",
     url="https://github.com/SergioRAgostinho/cvxpnpl",

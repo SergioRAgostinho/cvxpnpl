@@ -1,9 +1,19 @@
 import warnings
+
 import numpy as np
+from packaging import version
 from scipy.sparse import csc_matrix
 import scs
 
 __version__ = "1.0.3"
+
+# preserve support for SCS 2.x.x and 3.x.x
+if version.parse(scs.__version__) < version.parse("3.0.0"):
+    _CONES = {"f": 22, "l": 0, "q": [], "ep": 0, "s": [10]}  # cones
+    _scs_kwarg_map = dict(eps="eps", max_iters="max_iters", verbose="verbose")
+else:
+    _CONES = {"z": 22, "l": 0, "q": [], "ep": 0, "s": [10]}  # cones
+    _scs_kwarg_map = dict(eps="eps_abs", max_iters="max_iters", verbose="verbose")
 
 
 def _point_constraints(pts_2d, pts_3d, K):
@@ -445,13 +455,16 @@ def _solve_relaxation(A, B, eps=1e-9, max_iters=2500, verbose=False):
     Q = np.block([[A.T @ A, np.zeros((9, 1))], [np.zeros((1, 9)), 0]])
 
     # Invoke solver
+    scs_kwargs = {_scs_kwarg_map[k]: v for k, v in zip(
+        ["eps", "max_iters", "verbose"],
+        [eps, max_iters, verbose],
+    )}
     results = scs.solve(
         {"A": _A, "b": _b, "c": _vech10(Q, 2)},  # data
-        {"f": 22, "l": 0, "q": [], "ep": 0, "s": [10]},  # cones
-        verbose=verbose,
-        eps=eps,
-        max_iters=max_iters,
+        _CONES,
+        **scs_kwargs,
     )
+
     # Invoke solver
     Z = _vech10_inv(results["x"])
     if np.any(np.isnan(Z)):

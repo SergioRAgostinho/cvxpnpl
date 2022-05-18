@@ -1,3 +1,4 @@
+packaging
 numpy
 scipy
 scs>=2.0.0
