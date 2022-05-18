@@ -399,7 +399,10 @@ def _sdp_constraints():
         Ad[i + 1] = _vech10(0.5 * (P + P.T), 2)
 
         P = np.block(
-            [[np.kron(E_ij_rc[i], np.eye(3)), np.zeros((9, 1))], [np.zeros(9), -c[i]],]
+            [
+                [np.kron(E_ij_rc[i], np.eye(3)), np.zeros((9, 1))],
+                [np.zeros(9), -c[i]],
+            ]
         )
         Ad[i + 7] = _vech10(0.5 * (P + P.T), 2)
 
@@ -455,10 +458,13 @@ def _solve_relaxation(A, B, eps=1e-9, max_iters=2500, verbose=False):
     Q = np.block([[A.T @ A, np.zeros((9, 1))], [np.zeros((1, 9)), 0]])
 
     # Invoke solver
-    scs_kwargs = {_scs_kwarg_map[k]: v for k, v in zip(
-        ["eps", "max_iters", "verbose"],
-        [eps, max_iters, verbose],
-    )}
+    scs_kwargs = {
+        _scs_kwarg_map[k]: v
+        for k, v in zip(
+            ["eps", "max_iters", "verbose"],
+            [eps, max_iters, verbose],
+        )
+    }
     results = scs.solve(
         {"A": _A, "b": _b, "c": _vech10(Q, 2)},  # data
         _CONES,

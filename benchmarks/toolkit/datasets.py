@@ -69,7 +69,11 @@ class Dataset:
         data = json.loads(open(pjoin(self.prefix, "camera.json")).read())
         camera = Camera(
             K=np.array(
-                ((data["fx"], 0, data["cx"]), (0, data["fy"], data["cy"]), (0, 0, 1),)
+                (
+                    (data["fx"], 0, data["cx"]),
+                    (0, data["fy"], data["cy"]),
+                    (0, 0, 1),
+                )
             ),
             size=(data["width"], data["height"]),
         )

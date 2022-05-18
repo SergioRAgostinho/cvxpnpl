@@ -27,7 +27,10 @@ def _sdp_constraints_rc():
     c = np.array((1, 0, 0, 1, 0, 1))
     for i in range(6):
         P = np.block(
-            [[np.kron(E_ij_rc[i], np.eye(3)), np.zeros((9, 1))], [np.zeros(9), -c[i]],]
+            [
+                [np.kron(E_ij_rc[i], np.eye(3)), np.zeros((9, 1))],
+                [np.zeros(9), -c[i]],
+            ]
         )
         Ad[i + 1] = _vech10(0.5 * (P + P.T), 2)
 

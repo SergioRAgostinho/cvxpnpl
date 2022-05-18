@@ -161,7 +161,11 @@ class SynthSuite(Suite, ABC):
             )
 
         f.legend(
-            lineobjs, labels, loc="lower center", bbox_to_anchor=(0.5, 0.05), ncol=nc,
+            lineobjs,
+            labels,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.05),
+            ncol=nc,
         )
         plt.show()
 
