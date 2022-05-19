@@ -6,7 +6,7 @@ from packaging import version
 from scipy.sparse import csc_matrix
 import scs
 
-__version__ = "1.0.3"
+__version__ = "1.1.0"
 
 # preserve support for SCS 2.x.x and 3.x.x
 if version.parse(scs.__version__) < version.parse("3.0.0"):
