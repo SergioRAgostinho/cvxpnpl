@@ -23,6 +23,10 @@ def parse_version():
     visitor.visit(tree)
     return visitor.version
 
+def install_requires():
+    with open("requirements.txt") as f:
+        return list(map(str.rstrip, f))
+
 
 def long_description():
     with open("README.md", "r") as f:
@@ -36,7 +40,7 @@ setup(
     description="A convex Perspective-n-Points-and-Lines method.",
     long_description=long_description(),
     long_description_content_type="text/markdown",
-    install_requires=["packaging", "numpy", "scipy", "scs>=2.0.0"],
+    install_requires=install_requires(),
     author="Sérgio Agostinho",
     author_email="sergio@sergioagostinho.com",
     url="https://github.com/SergioRAgostinho/cvxpnpl",
